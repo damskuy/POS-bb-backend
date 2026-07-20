@@ -1,8 +1,10 @@
 node_modules
 .next
 .git
+.gitignore
+Dockerfile
+docker-compose.yml
+README.md
 .env
-.env*.local
-npm-debug.log*
-.DS_Store
-*.pem
+.env.local
+coverage
