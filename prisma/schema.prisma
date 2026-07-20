@@ -1,0 +1,311 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id        Int       @id @default(autoincrement())
+  name      String
+  phone     String    @unique
+  address   String?
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  vehicles  Vehicle[]
+  workOrders  WorkOrder[]
+
+  @@map("customers")
+}
+
+model Vehicle {
+  id           Int          @id @default(autoincrement())
+  customerId   Int
+  plateNumber  String       @unique
+  brand        String
+  model        String
+  year         Int?
+  transmission Transmission
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  deletedAt    DateTime?
+  customer     Customer     @relation(fields: [customerId], references: [id])
+  workOrders WorkOrder[]
+  @@map("vehicles")
+}
+
+model Mechanic {
+  id          Int         @id @default(autoincrement())
+  name        String
+  phone       String
+  address     String?
+  workOrders  WorkOrder[]
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
+
+  @@map("mechanics")
+}
+
+enum Transmission {
+  MANUAL
+  AUTOMATIC
+}
+
+enum WorkOrderStatus {
+  PENDING
+  IN_PROGRESS
+  WAITING_PART
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  QRIS
+  TRANSFER
+  EWALLET
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  CASHIER
+  MECHANIC
+}
+
+model Service {
+  id           Int                  @id @default(autoincrement())
+  name         String
+  price        Int
+  description  String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  deletedAt    DateTime?
+  packageItems ServicePackageItem[]
+  workOrders   WorkOrderService[]
+
+  @@map("services")
+}
+
+model SparePart {
+  id           Int                  @id @default(autoincrement())
+  name         String
+  sku          String?              @unique
+  stock        Int                  @default(0)
+  price        Int                  @default(0)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  deletedAt    DateTime?
+  packageItems ServicePackageItem[]
+  workOrders   WorkOrderPart[]
+
+  @@map("spare_parts")
+}
+
+model ServicePackage {
+  id          Int                  @id @default(autoincrement())
+  name        String
+  unitPrice       Int                  @default(0)
+  description String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  deletedAt   DateTime?
+  items       ServicePackageItem[]
+
+  @@map("service_packages")
+}
+
+model ServicePackageItem {
+  id               Int            @id @default(autoincrement())
+  servicePackageId Int
+  servicePackage   ServicePackage @relation(fields: [servicePackageId], references: [id])
+  serviceId        Int?
+  service          Service?       @relation(fields: [serviceId], references: [id])
+  sparePartId      Int?
+  sparePart        SparePart?     @relation(fields: [sparePartId], references: [id])
+  quantity         Int            @default(1)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  deletedAt        DateTime?
+
+  @@map("service_package_items")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+
+  name      String
+  email     String   @unique
+  password  String
+
+  role      UserRole @default(CASHIER)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  workOrders WorkOrder[]
+  auditLogs  AuditLog[]
+
+  @@map("users")
+}
+
+model WorkOrder {
+  id           Int                 @id @default(autoincrement())
+
+  code         String              @unique
+
+  customerId   Int
+  customer     Customer            @relation(fields: [customerId], references: [id])
+
+  vehicleId    Int
+  vehicle      Vehicle             @relation(fields: [vehicleId], references: [id])
+
+  mechanicId   Int?
+  mechanic     Mechanic?           @relation(fields: [mechanicId], references: [id])
+
+  userId       Int?
+  user         User?               @relation(fields: [userId], references: [id])
+
+  status       WorkOrderStatus     @default(PENDING)
+
+  complaint    String?
+  odometer     Int?
+  notes        String?
+
+  subtotal     Int                 @default(0)
+  discount     Int                 @default(0)
+  tax          Int                 @default(0)
+  grandTotal   Int                 @default(0)
+
+  checkInAt    DateTime?
+  finishedAt   DateTime?
+
+  services     WorkOrderService[]
+  parts        WorkOrderPart[]
+
+  payment      Payment?
+  invoice      Invoice?
+
+  scheduleDate DateTime?
+
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  deletedAt    DateTime?
+
+  @@map("work_orders")
+}
+
+model WorkOrderService {
+  id            Int         @id @default(autoincrement())
+
+  workOrderId   Int
+  workOrder     WorkOrder   @relation(fields: [workOrderId], references: [id])
+
+  serviceId     Int
+  service        Service     @relation(fields: [serviceId], references: [id])
+
+  price         Int
+  quantity      Int          @default(1)
+  subtotal      Int
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  deletedAt     DateTime?
+
+  @@map("work_order_services")
+}
+
+model WorkOrderPart {
+  id            Int         @id @default(autoincrement())
+
+  workOrderId   Int
+  workOrder     WorkOrder   @relation(fields: [workOrderId], references: [id])
+
+  sparePartId   Int
+  sparePart     SparePart   @relation(fields: [sparePartId], references: [id])
+
+  price         Int
+  quantity      Int         @default(1)
+  subtotal      Int
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  deletedAt     DateTime?
+
+  @@map("work_order_parts")
+}
+
+model Payment {
+  id                 Int              @id @default(autoincrement())
+
+  workOrderId        Int              @unique
+  workOrder          WorkOrder        @relation(fields: [workOrderId], references: [id])
+
+  method             PaymentMethod
+
+  amount             Int
+
+  status             PaymentStatus    @default(UNPAID)
+
+  referenceNumber    String?
+
+  paidAt             DateTime?
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  deletedAt          DateTime?
+
+  @@map("payments")
+}
+
+model Invoice {
+  id               Int         @id @default(autoincrement())
+
+  invoiceNumber    String      @unique
+
+  workOrderId      Int         @unique
+  workOrder        WorkOrder   @relation(fields: [workOrderId], references: [id])
+
+  printedAt        DateTime?
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  status           String?     @default("DRAFT")
+  issuedAt         DateTime?   @default(now())
+  deletedAt        DateTime?
+
+  @@map("invoices")
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  Int?
+  oldData   Json?
+  newData   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+
