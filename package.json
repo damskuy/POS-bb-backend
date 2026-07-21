@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "cross-env NODE_OPTIONS=--max-old-space-size=512 next build",
+    "build": "prisma generate && cross-env NODE_OPTIONS=--max-old-space-size=1024 next build",
+    "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
     "test:api": "node scripts/run-tests.js",
