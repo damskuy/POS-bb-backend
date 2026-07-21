@@ -1,5 +1,5 @@
 import { getApiDocs } from "@/lib/swagger";
-import ReactSwagger from "./swagger-ui";
+import SwaggerClient from "./swagger-client";
 
 export const metadata = {
   title: "API Documentation - POS Bengkel",
@@ -8,5 +8,7 @@ export const metadata = {
 
 export default async function ApiDocsPage() {
   const spec = await getApiDocs();
-  return <ReactSwagger spec={spec} />;
+  return <SwaggerClient spec={spec} />;
 }
+
+
