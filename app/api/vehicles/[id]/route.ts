@@ -237,6 +237,7 @@ export async function DELETE(
     requireRole(currentUser.role, [
       UserRole.ADMIN,
       UserRole.OWNER,
+      UserRole.CASHIER,
     ]);
 
     const { id } = await params;

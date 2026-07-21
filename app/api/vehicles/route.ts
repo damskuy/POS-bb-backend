@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma, Transmission, UserRole } from "@prisma/client";
 import { getPagination } from "@/lib/pagination";
@@ -105,7 +106,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
 
-    const { skip, limit } = getPagination(searchParams);
+    const { page, limit, skip } = getPagination(searchParams);
 
     const search = searchParams.get("search") || "";
     const customerId = searchParams.get("customerId");
@@ -161,22 +162,48 @@ export async function GET(request: Request) {
             mode: "insensitive",
           },
         },
+        {
+          customer: {
+            name: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+        },
+        {
+          customer: {
+            phone: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+        },
       ];
     }
 
-    const vehicles = await prisma.vehicle.findMany({
-      where,
-      include: {
-        customer: true,
-      },
-      orderBy: {
-        [sort]: order,
-      },
-      skip,
-      take: limit,
-    });
+    const [total, vehicles] = await Promise.all([
+      prisma.vehicle.count({ where }),
+      prisma.vehicle.findMany({
+        where,
+        include: {
+          customer: true,
+        },
+        orderBy: {
+          [sort]: order,
+        },
+        skip,
+        take: limit,
+      }),
+    ]);
 
-    return success(vehicles);
+    return NextResponse.json({
+      success: true,
+      data: vehicles,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (err) {
     if (err instanceof ForbiddenError) {
       return error("Forbidden", 403);

@@ -98,7 +98,7 @@ import { createAuditLog, getClientInfo } from "@/lib/audit/create-log";
 export async function GET(request: Request) {
   try {
     const currentUser = await getCurrentUser();
-    requireRole(currentUser.role, [UserRole.ADMIN]);
+    requireRole(currentUser.role, [UserRole.ADMIN, UserRole.OWNER]);
 
     const { searchParams } = new URL(request.url);
 
@@ -168,7 +168,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const currentUser = await getCurrentUser();
-    requireRole(currentUser.role, [UserRole.ADMIN]);
+    requireRole(currentUser.role, [UserRole.ADMIN, UserRole.OWNER]);
 
     const json = await request.json();
 

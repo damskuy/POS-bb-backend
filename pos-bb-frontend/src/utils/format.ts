@@ -10,6 +10,11 @@ export const formatRupiah = (amount: number): string => {
   }).format(amount);
 };
 
+export const formatDuration = (minutes?: number | null): string => {
+  if (!minutes || minutes <= 0) return "-";
+  return `${minutes} menit`;
+};
+
 export const formatDate = (dateString?: string | Date): string => {
   if (!dateString) return "-";
   const date = new Date(dateString);

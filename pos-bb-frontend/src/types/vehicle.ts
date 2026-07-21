@@ -1,3 +1,5 @@
+import { Customer } from "./customer";
+
 export type TransmissionType = "MANUAL" | "AUTOMATIC";
 
 export interface Vehicle {
@@ -8,8 +10,10 @@ export interface Vehicle {
   model: string;
   year?: number | null;
   transmission: TransmissionType;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  customer?: Customer;
 }
 
 export interface VehicleInput {
@@ -17,6 +21,16 @@ export interface VehicleInput {
   plateNumber: string;
   brand: string;
   model: string;
-  year?: number;
+  year?: number | null;
   transmission: TransmissionType;
+}
+
+export interface GetVehiclesParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  customerId?: number | string;
+  transmission?: TransmissionType;
+  sort?: string;
+  order?: "asc" | "desc";
 }

@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma, UserRole } from "@prisma/client";
 import { getPagination } from "@/lib/pagination";
@@ -93,7 +94,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
 
-    const { skip, limit } = getPagination(searchParams);
+    const { page, limit, skip } = getPagination(searchParams);
 
     const search = searchParams.get("search") || "";
 
@@ -125,19 +126,35 @@ export async function GET(request: Request) {
             mode: "insensitive",
           },
         },
+        {
+          address: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
       ];
     }
 
-    const mechanics = await prisma.mechanic.findMany({
-      where,
-      orderBy: {
-        [sort]: order,
-      },
-      skip,
-      take: limit,
-    });
+    const [total, mechanics] = await Promise.all([
+      prisma.mechanic.count({ where }),
+      prisma.mechanic.findMany({
+        where,
+        orderBy: {
+          [sort]: order,
+        },
+        skip,
+        take: limit,
+      }),
+    ]);
 
-    return success(mechanics);
+    return NextResponse.json({
+      success: true,
+      data: mechanics,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (err) {
     if (err instanceof ForbiddenError) {
       return error("Forbidden", 403);
@@ -153,6 +170,7 @@ export async function POST(request: Request) {
     requireRole(currentUser.role, [
       UserRole.ADMIN,
       UserRole.OWNER,
+      UserRole.CASHIER,
     ]);
 
     const json = await request.json();

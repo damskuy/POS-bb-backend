@@ -123,7 +123,7 @@ export async function GET(
 ) {
   try {
     const currentUser = await getCurrentUser();
-    requireRole(currentUser.role, [UserRole.ADMIN]);
+    requireRole(currentUser.role, [UserRole.ADMIN, UserRole.OWNER]);
 
     const { id } = await params;
 
@@ -154,7 +154,7 @@ export async function PATCH(
 ) {
   try {
     const currentUser = await getCurrentUser();
-    requireRole(currentUser.role, [UserRole.ADMIN]);
+    requireRole(currentUser.role, [UserRole.ADMIN, UserRole.OWNER]);
 
     const { id } = await params;
 
@@ -229,7 +229,7 @@ export async function DELETE(
 ) {
   try {
     const currentUser = await getCurrentUser();
-    requireRole(currentUser.role, [UserRole.ADMIN]);
+    requireRole(currentUser.role, [UserRole.ADMIN, UserRole.OWNER]);
 
     const { id } = await params;
 

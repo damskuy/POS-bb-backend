@@ -168,6 +168,7 @@ export async function PATCH(
     requireRole(currentUser.role, [
       UserRole.ADMIN,
       UserRole.OWNER,
+      UserRole.CASHIER,
     ]);
 
     const { id } = await params;
@@ -236,6 +237,8 @@ export async function DELETE(
     const currentUser = await getCurrentUser();
     requireRole(currentUser.role, [
       UserRole.ADMIN,
+      UserRole.OWNER,
+      UserRole.CASHIER,
     ]);
 
     const { id } = await params;
