@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 
 export async function middleware(request: NextRequest) {
+  if (request.method === "OPTIONS") {
+    return NextResponse.next();
+  }
+
   const token = request.headers
     .get("authorization")
     ?.replace("Bearer ", "");
