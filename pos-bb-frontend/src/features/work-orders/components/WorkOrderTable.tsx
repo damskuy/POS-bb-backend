@@ -86,96 +86,110 @@ export const WorkOrderTable: React.FC<WorkOrderTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm font-medium text-slate-700 animate-fadeIn">
-            {workOrders.map((wo) => (
-              <tr key={wo.id} className="hover:bg-slate-50/60 transition-colors group">
-                {/* WO Number */}
-                <td className="py-4 px-4 sm:px-6">
-                  <Link href={`/work-orders/${wo.id}`} className="group/link">
-                    <p className="font-mono font-bold text-blue-600 hover:text-blue-800 text-xs sm:text-sm transition-colors">
-                      {wo.code}
-                    </p>
-                    {wo.complaint && (
-                      <p className="text-xs text-slate-400 font-normal truncate max-w-[140px] mt-0.5">
-                        {wo.complaint}
+            {workOrders.map((wo) => {
+              const hasInvoice = Boolean(wo.invoice);
+
+              return (
+                <tr key={wo.id} className="hover:bg-slate-50/60 transition-colors group">
+                  {/* WO Number */}
+                  <td className="py-4 px-4 sm:px-6">
+                    <Link href={`/work-orders/${wo.id}`} className="group/link">
+                      <p className="font-mono font-bold text-blue-600 hover:text-blue-800 text-xs sm:text-sm transition-colors">
+                        {wo.code}
                       </p>
-                    )}
-                  </Link>
-                </td>
-
-                {/* Date */}
-                <td className="py-4 px-4 text-xs text-slate-500 font-normal whitespace-nowrap">
-                  {formatDate(wo.createdAt)}
-                </td>
-
-                {/* Customer */}
-                <td className="py-4 px-4">
-                  {wo.customer ? (
-                    <div>
-                      <p className="font-semibold text-slate-900 text-xs">{wo.customer.name}</p>
-                      <p className="text-[11px] text-slate-400 font-mono">{wo.customer.phone}</p>
-                    </div>
-                  ) : (
-                    <span className="text-slate-400 italic text-xs">-</span>
-                  )}
-                </td>
-
-                {/* Vehicle */}
-                <td className="py-4 px-4">
-                  {wo.vehicle ? (
-                    <div>
-                      <p className="font-mono font-bold text-slate-900 text-xs uppercase">{wo.vehicle.plateNumber}</p>
-                      <p className="text-[11px] text-slate-400">{wo.vehicle.brand} {wo.vehicle.model}</p>
-                    </div>
-                  ) : (
-                    <span className="text-slate-400 italic text-xs">-</span>
-                  )}
-                </td>
-
-                {/* Mechanic */}
-                <td className="py-4 px-4 text-xs text-slate-700 font-medium">
-                  {wo.mechanic?.name || <span className="text-slate-400 italic">-</span>}
-                </td>
-
-                {/* Status */}
-                <td className="py-4 px-4 text-center">
-                  <StatusBadge status={wo.status} />
-                </td>
-
-                {/* Grand Total */}
-                <td className="py-4 px-4 text-right">
-                  <span className="font-mono font-semibold text-slate-900 text-xs sm:text-sm">
-                    {formatRupiah(wo.grandTotal)}
-                  </span>
-                </td>
-
-                {/* Actions */}
-                <td className="py-4 px-4 sm:px-6 text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <Link
-                      href={`/work-orders/${wo.id}`}
-                      className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      title="Lihat Detail"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
+                      {wo.complaint && (
+                        <p className="text-xs text-slate-400 font-normal truncate max-w-[140px] mt-0.5">
+                          {wo.complaint}
+                        </p>
+                      )}
                     </Link>
-                    {onDelete && (
-                      <button
-                        onClick={() => onDelete(wo)}
-                        className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                        title="Hapus Work Order"
+                  </td>
+
+                  {/* Date */}
+                  <td className="py-4 px-4 text-xs text-slate-500 font-normal whitespace-nowrap">
+                    {formatDate(wo.createdAt)}
+                  </td>
+
+                  {/* Customer */}
+                  <td className="py-4 px-4">
+                    {wo.customer ? (
+                      <div>
+                        <p className="font-semibold text-slate-900 text-xs">{wo.customer.name}</p>
+                        <p className="text-[11px] text-slate-400 font-mono">{wo.customer.phone}</p>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 italic text-xs">-</span>
+                    )}
+                  </td>
+
+                  {/* Vehicle */}
+                  <td className="py-4 px-4">
+                    {wo.vehicle ? (
+                      <div>
+                        <p className="font-mono font-bold text-slate-900 text-xs uppercase">{wo.vehicle.plateNumber}</p>
+                        <p className="text-[11px] text-slate-400">{wo.vehicle.brand} {wo.vehicle.model}</p>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 italic text-xs">-</span>
+                    )}
+                  </td>
+
+                  {/* Mechanic */}
+                  <td className="py-4 px-4 text-xs text-slate-700 font-medium">
+                    {wo.mechanic?.name || <span className="text-slate-400 italic">-</span>}
+                  </td>
+
+                  {/* Status */}
+                  <td className="py-4 px-4 text-center">
+                    <StatusBadge status={wo.status} />
+                  </td>
+
+                  {/* Grand Total */}
+                  <td className="py-4 px-4 text-right">
+                    <span className="font-mono font-semibold text-slate-900 text-xs sm:text-sm">
+                      {formatRupiah(wo.grandTotal)}
+                    </span>
+                  </td>
+
+                  {/* Actions */}
+                  <td className="py-4 px-4 sm:px-6 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Link
+                        href={`/work-orders/${wo.id}`}
+                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Lihat Detail"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                         </svg>
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
+                      </Link>
+                      {onDelete && (
+                        <button
+                          type="button"
+                          disabled={hasInvoice}
+                          onClick={() => !hasInvoice && onDelete(wo)}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            hasInvoice
+                              ? "text-slate-300 bg-slate-50 border border-slate-200 cursor-not-allowed opacity-50"
+                              : "text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+                          }`}
+                          title={
+                            hasInvoice
+                              ? "❌ Cannot delete. This Work Order has already been invoiced."
+                              : "Hapus Work Order"
+                          }
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

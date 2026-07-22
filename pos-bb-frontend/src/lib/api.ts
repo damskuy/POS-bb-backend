@@ -1,6 +1,11 @@
 import { STORAGE_KEYS } from "@/constants/storage";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+const getBaseUrl = (): string => {
+  if (typeof window !== "undefined") {
+    return process.env.NEXT_PUBLIC_API_URL || window.location.origin;
+  }
+  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+};
 
 export class ApiError extends Error {
   status: number;
@@ -35,9 +40,10 @@ const getAuthToken = (): string | null => {
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const { token, params, headers, ...customConfig } = options;
 
+  const baseUrl = getBaseUrl();
   let url = endpoint.startsWith("http")
     ? endpoint
-    : `${BASE_URL.replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}`;
+    : `${baseUrl.replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}`;
 
   if (params) {
     const searchParams = new URLSearchParams();

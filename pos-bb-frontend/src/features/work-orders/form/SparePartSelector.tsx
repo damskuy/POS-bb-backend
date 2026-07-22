@@ -50,13 +50,13 @@ export const SparePartSelector: React.FC<SparePartSelectorProps> = ({
     onAdd({ sparePartId: part.id, price: part.price, quantity: 1 });
   };
 
-  const handleQtyChange = (id: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const qty = Math.max(1, parseInt(e.target.value, 10) || 1);
-    onUpdateQty(id, qty);
+  const handleQtyChange = (id: number, qty: number) => {
+    const validQty = Math.max(1, qty || 1);
+    onUpdateQty(id, validQty);
   };
 
   return (
-    <div className="border border-slate-200 rounded-xl overflow-hidden">
+    <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
       {/* Search bar */}
       <div className="p-3 border-b border-slate-100 bg-slate-50">
         <div className="relative">
@@ -64,6 +64,7 @@ export const SparePartSelector: React.FC<SparePartSelectorProps> = ({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
             placeholder="Cari suku cadang..."
             className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
           />
@@ -74,18 +75,20 @@ export const SparePartSelector: React.FC<SparePartSelectorProps> = ({
       </div>
 
       {/* Parts list */}
-      <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
+      <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 custom-scrollbar">
         {loading ? (
           <div className="p-6 text-center">
-            <div className="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full mx-auto" />
+            <div className="animate-spin w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full mx-auto" />
           </div>
         ) : parts.length === 0 ? (
-          <div className="p-6 text-center text-sm text-slate-400">
+          <div className="p-6 text-center text-xs text-slate-400">
             {search ? "Tidak ada suku cadang yang cocok" : "Belum ada suku cadang"}
           </div>
         ) : (
           parts.map((p) => {
             const selected = isSelected(p.id);
+            const currentQty = getQty(p.id);
+
             return (
               <div key={p.id} className={`flex items-center justify-between px-4 py-3 transition-colors ${selected ? "bg-orange-50/60" : "hover:bg-slate-50"}`}>
                 <div className="flex-1 min-w-0 mr-4">
@@ -101,25 +104,34 @@ export const SparePartSelector: React.FC<SparePartSelectorProps> = ({
                     <>
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => handleQtyChange(p.id, { target: { value: String(getQty(p.id) - 1) } } as any)}
-                          className="w-7 h-7 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center justify-center text-xs font-bold"
-                        >-</button>
+                          type="button"
+                          onClick={() => handleQtyChange(p.id, currentQty - 1)}
+                          className="w-7 h-7 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center justify-center text-xs font-bold transition-colors"
+                        >
+                          -
+                        </button>
                         <input
                           type="number"
                           min="1"
-                          value={getQty(p.id)}
-                          onChange={(e) => handleQtyChange(p.id, e)}
-                          className="w-12 text-center text-xs font-bold border border-slate-200 rounded-lg py-1 focus:outline-none focus:border-blue-400"
+                          max={p.stock || 999}
+                          value={currentQty}
+                          onChange={(e) => handleQtyChange(p.id, parseInt(e.target.value, 10) || 1)}
+                          onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+                          className="w-12 text-center text-xs font-bold border border-slate-200 rounded-lg py-1 focus:outline-none focus:border-orange-500"
                         />
                         <button
-                          onClick={() => handleQtyChange(p.id, { target: { value: String(getQty(p.id) + 1) } } as any)}
-                          className="w-7 h-7 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center justify-center text-xs font-bold"
-                        >+</button>
+                          type="button"
+                          onClick={() => handleQtyChange(p.id, currentQty + 1)}
+                          className="w-7 h-7 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center justify-center text-xs font-bold transition-colors"
+                        >
+                          +
+                        </button>
                       </div>
                       <button
+                        type="button"
                         onClick={() => onRemove(p.id)}
-                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"
-                        title="Hapus"
+                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Hapus Suku Cadang"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -128,9 +140,10 @@ export const SparePartSelector: React.FC<SparePartSelectorProps> = ({
                     </>
                   ) : (
                     <button
+                      type="button"
                       onClick={() => handleAdd(p)}
                       disabled={p.stock === 0}
-                      className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-lg flex items-center gap-1 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-lg flex items-center gap-1 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />

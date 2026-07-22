@@ -66,33 +66,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
    * Login method.
    */
   const login = async (credentials: LoginRequest): Promise<void> => {
-    setLoading(true);
-    try {
-      const response = await AuthService.login(credentials);
+    const response = await AuthService.login(credentials);
 
-      if (response.success && response.data) {
-        const authToken = response.data.accessToken || response.data.token;
-        const authUser = response.data.user;
+    if (response.success && response.data) {
+      const authToken = response.data.accessToken || response.data.token;
+      const authUser = response.data.user;
 
-        if (!authToken || !authUser) {
-          throw new Error("Invalid response format from authentication server.");
-        }
-
-        // Save to localStorage
-        AuthService.saveToken(authToken);
-        AuthService.saveUser(authUser);
-
-        // Update state
-        setToken(authToken);
-        setUser(authUser);
-
-        // Redirect to dashboard
-        router.push(ROUTES.DASHBOARD);
-      } else {
-        throw new Error(response.message || response.error || "Login failed");
+      if (!authToken || !authUser) {
+        throw new Error("Invalid response format from authentication server.");
       }
-    } finally {
-      setLoading(false);
+
+      // Save to localStorage
+      AuthService.saveToken(authToken);
+      AuthService.saveUser(authUser);
+
+      // Update state
+      setToken(authToken);
+      setUser(authUser);
+
+      // Redirect to dashboard
+      router.push(ROUTES.DASHBOARD);
+    } else {
+      throw new Error(response.message || response.error || "Login failed");
     }
   };
 

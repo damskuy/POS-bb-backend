@@ -81,7 +81,6 @@ export const ServiceTable: React.FC<ServiceTableProps> = ({
               <th className="py-3.5 px-4 sm:px-6">Nama Service</th>
               <th className="py-3.5 px-4">Kategori</th>
               <th className="py-3.5 px-4 text-right">Harga (Tarif)</th>
-              <th className="py-3.5 px-4 text-center">Estimasi Durasi</th>
               <th className="py-3.5 px-4 text-center">Status</th>
               <th className="py-3.5 px-4">Terdaftar</th>
               <th className="py-3.5 px-4 sm:px-6 text-right">Aksi</th>
@@ -128,13 +127,6 @@ export const ServiceTable: React.FC<ServiceTableProps> = ({
                   <td className="py-4 px-4 text-right">
                     <span className="font-semibold text-slate-900 text-sm font-mono">
                       {formatRupiah(service.price)}
-                    </span>
-                  </td>
-
-                  {/* Duration */}
-                  <td className="py-4 px-4 text-center">
-                    <span className="text-xs text-slate-600 font-semibold bg-blue-50/60 text-blue-700 px-2.5 py-1 rounded-lg border border-blue-100">
-                      {formatDuration(service.duration || 60)}
                     </span>
                   </td>
 

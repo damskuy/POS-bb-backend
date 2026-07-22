@@ -3,8 +3,10 @@
 import React, { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { PageContainer } from "@/components/common";
-import { CustomerSelector } from "@/features/work-orders/form/CustomerSelector";
-import { VehicleSelector } from "@/features/work-orders/form/VehicleSelector";
+import { CustomerCombobox } from "@/features/work-orders/form/CustomerCombobox";
+import { VehicleCombobox } from "@/features/work-orders/form/VehicleCombobox";
+import { CreateCustomerModal } from "@/features/work-orders/form/CreateCustomerModal";
+import { CreateVehicleModal } from "@/features/work-orders/form/CreateVehicleModal";
 import { MechanicSelector } from "@/features/work-orders/form/MechanicSelector";
 import { ServiceSelector } from "@/features/work-orders/form/ServiceSelector";
 import { SparePartSelector } from "@/features/work-orders/form/SparePartSelector";
@@ -35,6 +37,27 @@ export default function NewWorkOrderPage() {
   const [selectedParts, setSelectedParts] = useState<WorkOrderPartInput[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Hybrid flow modal states
+  const [showCreateCustomer, setShowCreateCustomer] = useState(false);
+  const [showCreateVehicle, setShowCreateVehicle] = useState(false);
+  const [vehicleRefreshKey, setVehicleRefreshKey] = useState(0);
+
+  // Called after customer successfully created in modal
+  const handleCustomerCreated = useCallback((newCustomer: Customer) => {
+    setCustomer(newCustomer);
+    setVehicle(null);
+    setShowCreateCustomer(false);
+    showToast("Customer berhasil dibuat.", "success");
+  }, [showToast]);
+
+  // Called after vehicle successfully created in modal
+  const handleVehicleCreated = useCallback((newVehicle: Vehicle) => {
+    setVehicleRefreshKey((k) => k + 1);
+    setVehicle(newVehicle);
+    setShowCreateVehicle(false);
+    showToast("Kendaraan berhasil dibuat.", "success");
+  }, [showToast]);
 
   // Service handlers
   const handleAddService = useCallback((item: WorkOrderServiceInput) => {
@@ -141,16 +164,19 @@ export default function NewWorkOrderPage() {
               <h2 className="text-sm font-bold text-slate-900">Customer & Kendaraan</h2>
             </div>
 
-            <CustomerSelector
+            <CustomerCombobox
               value={customer}
               onChange={(c) => { setCustomer(c); setVehicle(null); }}
+              onAddNew={() => setShowCreateCustomer(true)}
               error={errors.customer}
             />
 
-            <VehicleSelector
+            <VehicleCombobox
               customerId={customer?.id ?? null}
               value={vehicle}
               onChange={setVehicle}
+              onAddNew={() => setShowCreateVehicle(true)}
+              refreshKey={vehicleRefreshKey}
               error={errors.vehicle}
             />
 
@@ -237,7 +263,6 @@ export default function NewWorkOrderPage() {
               selectedServices={selectedServices}
               onAdd={handleAddService}
               onRemove={handleRemoveService}
-              onUpdateQty={handleUpdateServiceQty}
             />
           </div>
 
@@ -304,6 +329,23 @@ export default function NewWorkOrderPage() {
           />
         </div>
       </form>
+
+      {/* ── Hybrid Flow Modals ── */}
+      <CreateCustomerModal
+        isOpen={showCreateCustomer}
+        onClose={() => setShowCreateCustomer(false)}
+        onSuccess={handleCustomerCreated}
+      />
+
+      {customer && (
+        <CreateVehicleModal
+          isOpen={showCreateVehicle}
+          onClose={() => setShowCreateVehicle(false)}
+          customerId={customer.id}
+          customerName={customer.name}
+          onSuccess={handleVehicleCreated}
+        />
+      )}
     </PageContainer>
   );
 }

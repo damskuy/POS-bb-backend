@@ -90,7 +90,12 @@ export interface WorkOrder {
     amount: number;
     paidAt?: string | null;
   } | null;
-  invoice?: any | null;
+  invoice?: {
+    id: number;
+    invoiceNumber: string;
+    status: string;
+    paymentStatus?: string;
+  } | null;
 }
 
 export interface WorkOrderInput {

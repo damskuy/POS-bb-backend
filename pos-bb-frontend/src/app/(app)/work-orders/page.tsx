@@ -100,6 +100,16 @@ export default function WorkOrdersPage() {
                 </p>
               </div>
             </div>
+
+            {woToDelete.invoice && (
+              <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                <span>❌ Cannot delete. This Work Order has already been invoiced.</span>
+              </div>
+            )}
+
             <div className="flex gap-2 justify-end mt-4">
               <button
                 onClick={() => setWoToDelete(null)}
@@ -109,8 +119,8 @@ export default function WorkOrdersPage() {
               </button>
               <button
                 onClick={handleDeleteConfirm}
-                disabled={deleting}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-colors disabled:opacity-60"
+                disabled={deleting || Boolean(woToDelete.invoice)}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {deleting ? "Menghapus..." : "Ya, Hapus"}
               </button>

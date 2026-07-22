@@ -17,7 +17,7 @@ export const LoginForm: React.FC = () => {
     setErrorMessage(null);
 
     if (!email.trim() || !password) {
-      setErrorMessage("Please enter both email and password.");
+      setErrorMessage("Harap masukkan email dan password.");
       return;
     }
 
@@ -29,9 +29,10 @@ export const LoginForm: React.FC = () => {
       });
     } catch (err: any) {
       const msg =
+        err?.data?.error ||
         err?.data?.message ||
         err?.message ||
-        "Failed to authenticate. Please check your credentials and network connection.";
+        "Gagal masuk. Silakan periksa kredensial dan koneksi jaringan Anda.";
       setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
