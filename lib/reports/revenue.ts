@@ -43,6 +43,7 @@ export async function getRevenueReport(filter: RevenueReportFilter = {}) {
         amount: true,
         paidAt: true,
         createdAt: true,
+        method: true,
       },
       orderBy: [
         { paidAt: "asc" },
@@ -61,6 +62,8 @@ export async function getRevenueReport(filter: RevenueReportFilter = {}) {
     { date: string; revenue: number; transactions: number }
   > = {};
 
+  const methodMap: Record<string, number> = {};
+
   for (const p of payments) {
     const dateObj = p.paidAt || p.createdAt;
     const dateStr = dateObj.toISOString().split("T")[0];
@@ -74,16 +77,36 @@ export async function getRevenueReport(filter: RevenueReportFilter = {}) {
     }
     dailyMap[dateStr].revenue += p.amount;
     dailyMap[dateStr].transactions += 1;
+
+    methodMap[p.method] = (methodMap[p.method] || 0) + p.amount;
   }
 
   const dailyRevenue = Object.values(dailyMap).sort((a, b) =>
     a.date.localeCompare(b.date)
   );
 
+  const methodColors: Record<string, string> = {
+    CASH: "#10b981",
+    QRIS: "#3b82f6",
+    TRANSFER: "#f59e0b",
+    EWALLET: "#7c3aed",
+  };
+
+  const paymentMethods = Object.entries(methodMap).map(([method, amount]) => {
+    const percentage = totalRevenue > 0 ? Math.round((amount / totalRevenue) * 100) : 0;
+    return {
+      method,
+      amount,
+      percentage,
+      color: methodColors[method] || "#64748b",
+    };
+  });
+
   return {
     totalRevenue,
     totalTransactions,
     averageTransaction,
     dailyRevenue,
+    paymentMethods,
   };
 }

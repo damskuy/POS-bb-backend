@@ -1,5 +1,4 @@
 import React from "react";
-import { woInsights } from "@/mock/workOrderReport";
 
 const typeConfig = {
   success: {
@@ -31,9 +30,44 @@ const typeConfig = {
   },
 };
 
-export const WorkOrderInsights: React.FC = () => {
+interface WorkOrderInsightsProps {
+  summary: {
+    pending: number;
+    inProgress: number;
+    completed: number;
+    cancelled: number;
+  };
+}
+
+export const WorkOrderInsights: React.FC<WorkOrderInsightsProps> = ({
+  summary,
+}) => {
+  const total = summary.pending + summary.inProgress + summary.completed + summary.cancelled;
+  const completionRate = total > 0 ? Math.round((summary.completed / total) * 100) : 0;
+
+  const insights = [
+    {
+      id: 1,
+      type: "info" as const,
+      text: `Total Perintah Kerja (Work Order) yang terdaftar pada periode ini sebanyak ${total} order.`,
+    },
+    {
+      id: 2,
+      type: completionRate >= 70 ? ("success" as const) : ("warning" as const),
+      text: `Rasio penyelesaian pengerjaan service berada di angka ${completionRate}% dari total target antrean.`,
+    },
+    {
+      id: 3,
+      type: summary.pending > 5 ? ("warning" as const) : ("success" as const),
+      text:
+        summary.pending > 5
+          ? `Terdapat ${summary.pending} antrean tertunda (Pending). Segera alokasikan mekanik untuk mempercepat pengerjaan.`
+          : "Jumlah antrean pending terkendali dengan baik, efisiensi mekanik terjaga optimal.",
+    },
+  ];
+
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-5 flex flex-col h-full">
+    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-5 flex flex-col h-full animate-fadeIn">
       {/* Header */}
       <div className="flex items-center gap-2 mb-6">
         <div className="w-6 h-6 bg-amber-50 rounded-lg flex items-center justify-center">
@@ -46,7 +80,7 @@ export const WorkOrderInsights: React.FC = () => {
 
       {/* Insights bullet points */}
       <div className="space-y-4 flex-1 flex flex-col justify-center">
-        {woInsights.map((insight) => {
+        {insights.map((insight) => {
           const config = typeConfig[insight.type] || typeConfig.info;
           return (
             <div

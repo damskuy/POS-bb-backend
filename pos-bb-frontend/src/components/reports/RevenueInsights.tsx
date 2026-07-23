@@ -1,5 +1,5 @@
 import React from "react";
-import { revenueInsights } from "@/mock/revenueReport";
+import { formatRupiah } from "@/utils/format";
 
 const typeConfig = {
   success: {
@@ -31,9 +31,41 @@ const typeConfig = {
   },
 };
 
-export const RevenueInsights: React.FC = () => {
+interface RevenueInsightsProps {
+  totalRevenue: number;
+  totalTransactions: number;
+  averageTransaction: number;
+}
+
+export const RevenueInsights: React.FC<RevenueInsightsProps> = ({
+  totalRevenue,
+  totalTransactions,
+  averageTransaction,
+}) => {
+  // Generate real dynamic insights
+  const insights = [
+    {
+      id: 1,
+      type: "info" as const,
+      text: `Total pendapatan terakumulasi sebesar ${formatRupiah(totalRevenue)} dari ${totalTransactions} transaksi pembayaran lunas.`,
+    },
+    {
+      id: 2,
+      type: "success" as const,
+      text: `Rata-rata tiket transaksi bernilai ${formatRupiah(averageTransaction)}, menunjukkan distribusi kontribusi jasa dan part yang sehat.`,
+    },
+    {
+      id: 3,
+      type: averageTransaction < 500000 ? ("warning" as const) : ("success" as const),
+      text:
+        averageTransaction < 500000
+          ? "Rata-rata tiket per transaksi berada di bawah target. Tawarkan paket service bundling untuk meningkatkan penjualan."
+          : "Efisiensi penjualan paket service optimal dengan nilai tiket transaksi harian yang tinggi.",
+    },
+  ];
+
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-5 flex flex-col h-full">
+    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-5 flex flex-col h-full animate-fadeIn">
       {/* Header */}
       <div className="flex items-center gap-2 mb-6">
         <div className="w-6 h-6 bg-amber-50 rounded-lg flex items-center justify-center">
@@ -46,7 +78,7 @@ export const RevenueInsights: React.FC = () => {
 
       {/* Insights Bullet Points */}
       <div className="space-y-4 flex-1 flex flex-col justify-center">
-        {revenueInsights.map((insight) => {
+        {insights.map((insight) => {
           const config = typeConfig[insight.type] || typeConfig.info;
           return (
             <div

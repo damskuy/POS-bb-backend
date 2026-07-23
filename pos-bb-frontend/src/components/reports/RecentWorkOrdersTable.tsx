@@ -1,6 +1,20 @@
 import React from "react";
-import { formatRupiah } from "@/utils/format";
-import { recentWorkOrders } from "@/mock/workOrderReport";
+import { formatRupiah, formatDate } from "@/utils/format";
+
+interface WorkOrderRow {
+  code: string;
+  customer?: { name: string } | null;
+  vehicle?: { plateNumber: string } | null;
+  mechanic?: { name: string } | null;
+  status: string;
+  createdAt: string;
+  finishedAt: string | null;
+  grandTotal: number;
+}
+
+interface RecentWorkOrdersTableProps {
+  workOrders: WorkOrderRow[];
+}
 
 const statusConfig = {
   Waiting: { bg: "bg-amber-50 text-amber-700 border-amber-200", label: "Waiting" },
@@ -9,9 +23,18 @@ const statusConfig = {
   Cancelled: { bg: "bg-rose-50 text-rose-700 border-rose-200", label: "Cancelled" },
 };
 
-export const RecentWorkOrdersTable: React.FC = () => {
+const getWOStatusLabel = (status: string): "Waiting" | "In Progress" | "Finished" | "Cancelled" => {
+  if (status === "PENDING" || status === "WAITING_PART") return "Waiting";
+  if (status === "IN_PROGRESS" || status === "READY") return "In Progress";
+  if (status === "CANCELLED") return "Cancelled";
+  return "Finished";
+};
+
+export const RecentWorkOrdersTable: React.FC<RecentWorkOrdersTableProps> = ({
+  workOrders,
+}) => {
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden flex flex-col h-full animate-fadeIn">
       {/* Header */}
       <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -23,13 +46,13 @@ export const RecentWorkOrdersTable: React.FC = () => {
           <h3 className="text-sm font-bold text-slate-900">Recent Work Orders</h3>
         </div>
         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-          {recentWorkOrders.length} orders
+          {workOrders.length} orders
         </span>
       </div>
 
       {/* Table grid */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs text-left">
+      <div className="overflow-x-auto flex-1">
+        <table className="w-full text-xs text-left min-w-[700px]">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
               <th className="py-3.5 px-5">WO Number</th>
@@ -43,27 +66,37 @@ export const RecentWorkOrdersTable: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-            {recentWorkOrders.map((row) => {
-              const s = statusConfig[row.status];
+            {workOrders.map((row) => {
+              const mapped = getWOStatusLabel(row.status);
+              const s = statusConfig[mapped];
               return (
                 <tr key={row.code} className="hover:bg-slate-50/60 transition-colors">
                   <td className="py-3.5 px-5 font-mono font-bold text-slate-900">{row.code}</td>
-                  <td className="py-3.5 px-4 font-semibold text-slate-900">{row.customerName}</td>
-                  <td className="py-3.5 px-4 font-mono uppercase text-slate-600">{row.plateNumber}</td>
-                  <td className="py-3.5 px-4 text-slate-600">{row.mechanicName}</td>
+                  <td className="py-3.5 px-4 font-semibold text-slate-900">{row.customer?.name || "-"}</td>
+                  <td className="py-3.5 px-4 font-mono uppercase text-slate-600">{row.vehicle?.plateNumber || "-"}</td>
+                  <td className="py-3.5 px-4 text-slate-600">{row.mechanic?.name || "-"}</td>
                   <td className="py-3.5 px-4 text-center">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${s.bg}`}>
                       {s.label}
                     </span>
                   </td>
-                  <td className="py-3.5 px-4 text-center font-mono text-slate-500">{row.createdAt}</td>
-                  <td className="py-3.5 px-4 text-center font-mono text-slate-500">{row.finishedAt}</td>
+                  <td className="py-3.5 px-4 text-center font-semibold text-slate-500">{formatDate(row.createdAt)}</td>
+                  <td className="py-3.5 px-4 text-center font-semibold text-slate-500">
+                    {row.finishedAt ? formatDate(row.finishedAt) : "-"}
+                  </td>
                   <td className="py-3.5 px-5 text-right font-mono font-bold text-slate-900">
-                    {formatRupiah(row.total)}
+                    {formatRupiah(row.grandTotal)}
                   </td>
                 </tr>
               );
             })}
+            {workOrders.length === 0 && (
+              <tr>
+                <td colSpan={8} className="py-8 text-center text-slate-400 font-semibold">
+                  No work order records found
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

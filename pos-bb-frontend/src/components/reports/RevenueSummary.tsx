@@ -1,6 +1,5 @@
 import React from "react";
-import { formatRupiah } from "@/utils/format";
-import { revenueSummary } from "@/mock/revenueReport";
+import { formatRupiah, formatDate } from "@/utils/format";
 
 interface KpiCardProps {
   title: string;
@@ -35,7 +34,7 @@ const KpiCard: React.FC<KpiCardProps> = ({
       </div>
 
       <div className="flex items-baseline gap-2">
-        <h3 className="text-2xl font-bold tracking-tight text-slate-900">
+        <h3 className="text-2xl font-bold tracking-tight text-slate-900 truncate" title={String(value)}>
           {value}
         </h3>
       </div>
@@ -60,16 +59,28 @@ const KpiCard: React.FC<KpiCardProps> = ({
   );
 };
 
-export const RevenueSummary: React.FC = () => {
+interface RevenueSummaryProps {
+  totalRevenue: number;
+  totalTransactions: number;
+  averageTransaction: number;
+  highestDayLabel: string;
+  highestDayValue: number;
+}
+
+export const RevenueSummary: React.FC<RevenueSummaryProps> = ({
+  totalRevenue,
+  totalTransactions,
+  averageTransaction,
+  highestDayLabel,
+  highestDayValue,
+}) => {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fadeIn">
       {/* Total Revenue */}
       <KpiCard
         title="Total Revenue"
-        value={formatRupiah(revenueSummary.totalRevenue)}
-        change={revenueSummary.totalRevenueChange}
-        isPositive={true}
-        comparisonText="vs previous period"
+        value={formatRupiah(totalRevenue)}
+        comparisonText="Total sales revenue"
         iconBg="bg-emerald-50"
         iconColor="text-emerald-600"
         icon={
@@ -79,13 +90,11 @@ export const RevenueSummary: React.FC = () => {
         }
       />
 
-      {/* Total Invoices */}
+      {/* Total Transactions */}
       <KpiCard
-        title="Total Invoices"
-        value={revenueSummary.totalInvoices}
-        change={revenueSummary.totalInvoicesChange}
-        isPositive={true}
-        comparisonText="vs previous period"
+        title="Total Transactions"
+        value={totalTransactions}
+        comparisonText="Completed invoice payments"
         iconBg="bg-blue-50"
         iconColor="text-blue-600"
         icon={
@@ -98,10 +107,8 @@ export const RevenueSummary: React.FC = () => {
       {/* Average Transaction */}
       <KpiCard
         title="Average Transaction"
-        value={formatRupiah(revenueSummary.averageTransaction)}
-        change={revenueSummary.averageTransactionChange}
-        isPositive={true}
-        comparisonText="vs previous period"
+        value={formatRupiah(averageTransaction)}
+        comparisonText="Mean value per ticket"
         iconBg="bg-purple-50"
         iconColor="text-purple-600"
         icon={
@@ -114,8 +121,8 @@ export const RevenueSummary: React.FC = () => {
       {/* Highest Revenue Day */}
       <KpiCard
         title="Highest Revenue Day"
-        value={revenueSummary.highestRevenueDayName}
-        comparisonText={`Peak: ${formatRupiah(revenueSummary.highestRevenueDayValue)}`}
+        value={highestDayLabel !== "-" ? formatDate(highestDayLabel) : "-"}
+        comparisonText={`Peak: ${formatRupiah(highestDayValue)}`}
         iconBg="bg-amber-50"
         iconColor="text-amber-600"
         icon={

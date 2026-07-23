@@ -28,7 +28,6 @@ export default function DashboardPage() {
       <PageHeader
         title={`Selamat datang, ${user?.name || "User"}! 👋`}
         subtitle={today}
-        badge={user?.role || "ADMIN"}
       />
 
       {/* Section 1: Quick Actions */}

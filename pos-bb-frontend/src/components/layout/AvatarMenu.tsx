@@ -33,16 +33,16 @@ export const AvatarMenu: React.FC = () => {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-3 p-1.5 rounded-xl hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+        className="flex items-center gap-3 p-1.5 rounded-xl hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500/20"
       >
-        <div className="w-9 h-9 bg-blue-600 text-white font-bold text-sm rounded-xl flex items-center justify-center shadow-xs">
+        <div className="w-9 h-9 bg-slate-900 text-white font-bold text-sm rounded-xl flex items-center justify-center shadow-xs">
           {getInitials(user?.name)}
         </div>
         <div className="text-left hidden md:block">
           <p className="text-xs font-bold text-slate-800 leading-tight">
             {user?.name || "User"}
           </p>
-          <p className="text-[11px] font-semibold text-blue-600 leading-tight">
+          <p className="text-[10px] font-semibold text-slate-500 leading-tight">
             {user?.role || "STAFF"}
           </p>
         </div>

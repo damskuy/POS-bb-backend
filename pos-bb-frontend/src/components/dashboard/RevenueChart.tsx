@@ -28,7 +28,7 @@ export const RevenueChart: React.FC = () => {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; value: number } | null>(null);
 
   const maxValue = Math.max(...last7Days.map((d) => d.value));
-  const minValue = Math.min(...last7Days.map((d) => d.value));
+  const minValue = 0;
   const range = maxValue - minValue || 1;
 
   const width = 100;
@@ -51,44 +51,40 @@ export const RevenueChart: React.FC = () => {
     })
     .join(" ");
 
-  const areaD = `${pathD} L ${points[points.length - 1].x} ${height - paddingY} L ${points[0].x} ${height - paddingY} Z`;
-
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+    <div className="bg-white rounded-2xl shadow-2xs border border-slate-100 animate-fadeIn">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+      <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-emerald-50 rounded-lg flex items-center justify-center">
-            <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+          <div className="text-slate-400">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
             </svg>
           </div>
-          <h3 className="text-sm font-bold text-slate-900">Revenue (Last 7 Days)</h3>
+          <h3 className="text-[14px] font-bold text-slate-800">Revenue (Last 7 Days)</h3>
         </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-0">
         {/* Chart Area */}
-        <div className="flex-1 p-5 relative">
+        <div className="flex-1 p-6 relative">
           {/* Y-axis labels */}
-          <div className="absolute left-5 top-5 bottom-5 flex flex-col justify-between pointer-events-none">
-            {[1, 0.5, 0].map((factor) => (
-              <span key={factor} className="text-[9px] text-slate-400 font-mono leading-none">
-                {(minValue + factor * range / 1000000).toFixed(1)}jt
-              </span>
-            ))}
+          <div className="absolute left-6 top-6 bottom-6 flex flex-col justify-between pointer-events-none text-[9px] font-mono text-slate-400 select-none">
+            <span>{(maxValue / 1000000).toFixed(1)}jt</span>
+            <span>{((maxValue / 2) / 1000000).toFixed(1)}jt</span>
+            <span>0jt</span>
           </div>
 
           {/* SVG Chart */}
-          <div className="ml-8 relative">
+          <div className="ml-10 relative">
             <svg
               viewBox={`0 0 100 ${height}`}
-              className="w-full"
+              className="w-full overflow-visible"
               style={{ height: "140px" }}
               onMouseLeave={() => setTooltip(null)}
             >
               {/* Grid lines */}
-              {[0.25, 0.5, 0.75].map((f) => (
+              {[0, 0.25, 0.5, 0.75, 1].map((f) => (
                 <line
                   key={f}
                   x1={paddingX}
@@ -96,21 +92,12 @@ export const RevenueChart: React.FC = () => {
                   x2={width - paddingX}
                   y2={paddingY + f * (height - paddingY * 2)}
                   stroke="#f1f5f9"
-                  strokeWidth="0.5"
+                  strokeWidth="0.2"
                 />
               ))}
 
-              {/* Area fill */}
-              <defs>
-                <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.15" />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity="0.01" />
-                </linearGradient>
-              </defs>
-              <path d={areaD} fill="url(#revenueGrad)" />
-
               {/* Line */}
-              <path d={pathD} fill="none" stroke="#10b981" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round" />
+              <path d={pathD} fill="none" stroke="#0f172a" strokeWidth="0.6" strokeLinecap="round" strokeLinejoin="round" />
 
               {/* Points */}
               {points.map((p, i) => (
@@ -118,10 +105,10 @@ export const RevenueChart: React.FC = () => {
                   <circle
                     cx={p.x}
                     cy={p.y}
-                    r="1.5"
+                    r="0.8"
                     fill="white"
-                    stroke="#10b981"
-                    strokeWidth="0.8"
+                    stroke="#0f172a"
+                    strokeWidth="0.4"
                     style={{ cursor: "pointer" }}
                     onMouseEnter={(e) => {
                       const svgEl = (e.target as SVGElement).closest("svg");
@@ -137,10 +124,6 @@ export const RevenueChart: React.FC = () => {
                       });
                     }}
                   />
-                  {/* Today highlight */}
-                  {i === points.length - 1 && (
-                    <circle cx={p.x} cy={p.y} r="2" fill="#10b981" stroke="white" strokeWidth="0.5" />
-                  )}
                 </g>
               ))}
             </svg>
@@ -148,18 +131,18 @@ export const RevenueChart: React.FC = () => {
             {/* Tooltip */}
             {tooltip && (
               <div
-                className="absolute pointer-events-none z-10 bg-slate-900 text-white text-[10px] font-semibold rounded-lg px-2.5 py-1.5 shadow-xl whitespace-nowrap -translate-x-1/2 -translate-y-full -mt-2"
+                className="absolute pointer-events-none z-10 bg-slate-900 text-white text-[10px] font-semibold rounded-lg px-2.5 py-1.5 shadow-xl whitespace-nowrap -translate-x-1/2 -translate-y-full -mt-3.5 transition-all"
                 style={{ left: tooltip.x, top: tooltip.y }}
               >
                 <p className="text-slate-300 font-normal">{tooltip.label}</p>
-                <p className="font-mono font-bold text-emerald-400">{formatRupiah(tooltip.value)}</p>
+                <p className="font-mono font-bold text-emerald-400 font-tabular">{formatRupiah(tooltip.value)}</p>
               </div>
             )}
 
             {/* X-axis labels */}
-            <div className="flex justify-between mt-2">
+            <div className="flex justify-between mt-3 text-[9px] font-semibold text-slate-400 select-none border-t border-slate-50 pt-2">
               {last7Days.map((d, i) => (
-                <span key={i} className={`text-[9px] font-medium ${i === last7Days.length - 1 ? "text-emerald-600 font-bold" : "text-slate-400"}`}>
+                <span key={i} className={i === last7Days.length - 1 ? "text-slate-800 font-bold" : ""}>
                   {d.label}
                 </span>
               ))}
@@ -168,28 +151,28 @@ export const RevenueChart: React.FC = () => {
         </div>
 
         {/* Right Side Summary */}
-        <div className="lg:w-44 border-t lg:border-t-0 lg:border-l border-slate-100 p-5 flex flex-col justify-center gap-4 shrink-0">
+        <div className="lg:w-44 border-t lg:border-t-0 lg:border-l border-slate-100 p-6 flex flex-col justify-center gap-4 shrink-0 bg-slate-50/10">
           <div>
-            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">Today</p>
-            <p className="font-mono text-base font-bold text-slate-900">{formatRupiah(todayRevenue)}</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Today</p>
+            <p className="font-mono text-base font-extrabold text-slate-900 font-tabular">{formatRupiah(todayRevenue)}</p>
           </div>
           <div>
-            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">Yesterday</p>
-            <p className="font-mono text-base font-bold text-slate-700">{formatRupiah(yesterdayRevenue)}</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Yesterday</p>
+            <p className="font-mono text-base font-bold text-slate-500 font-tabular">{formatRupiah(yesterdayRevenue)}</p>
           </div>
           <div className="pt-3 border-t border-slate-100">
-            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">Difference</p>
-            <p className={`font-mono text-sm font-bold ${isPositive ? "text-emerald-600" : "text-rose-600"}`}>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Difference</p>
+            <p className={`font-mono text-xs font-bold ${isPositive ? "text-emerald-600" : "text-rose-600"} font-tabular`}>
               {isPositive ? "+" : ""}{formatRupiah(diff)}
             </p>
             <span
-              className={`mt-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-bold rounded-full border ${
+              className={`mt-2.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-black rounded-full border ${
                 isPositive
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : "bg-rose-50 text-rose-700 border-rose-200"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                  : "bg-rose-50 text-rose-700 border-rose-100"
               }`}
             >
-              {isPositive ? "↑" : "↓"} {Math.abs(Math.round((diff / yesterdayRevenue) * 100))}% from yesterday
+              {isPositive ? "↑" : "↓"} {Math.abs(Math.round((diff / yesterdayRevenue) * 100))}%
             </span>
           </div>
         </div>

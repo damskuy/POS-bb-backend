@@ -1,11 +1,21 @@
 import React from "react";
-import { mechanicPerformance } from "@/mock/workOrderReport";
 
-export const MechanicPerformanceChart: React.FC = () => {
-  const maxCompleted = Math.max(...mechanicPerformance.map((m) => m.completed));
+interface PerformanceItem {
+  name: string;
+  completed: number;
+}
+
+interface MechanicPerformanceChartProps {
+  mechanicPerformance: PerformanceItem[];
+}
+
+export const MechanicPerformanceChart: React.FC<MechanicPerformanceChartProps> = ({
+  mechanicPerformance,
+}) => {
+  const maxCompleted = Math.max(...mechanicPerformance.map((m) => m.completed), 1);
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-5 flex flex-col h-full">
+    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-5 flex flex-col h-full animate-fadeIn">
       {/* Header */}
       <div className="flex items-center gap-2 mb-6 shrink-0">
         <div className="w-6 h-6 bg-emerald-50 rounded-lg flex items-center justify-center">
@@ -35,6 +45,11 @@ export const MechanicPerformanceChart: React.FC = () => {
             </div>
           );
         })}
+        {mechanicPerformance.length === 0 && (
+          <p className="text-center text-xs text-slate-400 font-semibold py-8">
+            No completed work orders by mechanics found
+          </p>
+        )}
       </div>
     </div>
   );

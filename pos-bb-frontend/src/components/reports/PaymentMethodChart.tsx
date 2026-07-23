@@ -1,17 +1,27 @@
 import React from "react";
 import { formatRupiah } from "@/utils/format";
-import { paymentMethods } from "@/mock/revenueReport";
 
-export const PaymentMethodChart: React.FC = () => {
-  // SVG concentric circles stroke settings:
-  // Circle circumference is 2 * pi * r = 2 * 3.14159 * 10 = 62.8318
+interface PaymentMethodItem {
+  method: string;
+  amount: number;
+  percentage: number;
+  color: string;
+}
+
+interface PaymentMethodChartProps {
+  paymentMethods: PaymentMethodItem[];
+}
+
+export const PaymentMethodChart: React.FC<PaymentMethodChartProps> = ({
+  paymentMethods,
+}) => {
   const radius = 10;
-  const circ = 2 * Math.PI * radius; // 62.83
+  const circ = 2 * Math.PI * radius; // 62.8318
 
   let accumulatedPercent = 0;
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-5 flex flex-col h-full">
+    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-5 flex flex-col h-full animate-fadeIn">
       {/* Header */}
       <div className="flex items-center gap-2 mb-6 shrink-0">
         <div className="w-6 h-6 bg-purple-50 rounded-lg flex items-center justify-center">
@@ -68,7 +78,7 @@ export const PaymentMethodChart: React.FC = () => {
             <div key={m.method} className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: m.color }} />
-                <span className="font-semibold text-slate-700">{m.method}</span>
+                <span className="font-semibold text-slate-700 capitalize">{m.method.toLowerCase()}</span>
               </div>
               <div className="text-right">
                 <span className="font-bold text-slate-900 font-mono">{m.percentage}%</span>
@@ -78,6 +88,11 @@ export const PaymentMethodChart: React.FC = () => {
               </div>
             </div>
           ))}
+          {paymentMethods.length === 0 && (
+            <p className="text-center text-xs text-slate-400 font-semibold py-8">
+              No transactions recorded
+            </p>
+          )}
         </div>
       </div>
     </div>

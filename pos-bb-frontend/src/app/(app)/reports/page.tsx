@@ -4,21 +4,53 @@ import React, { useState } from "react";
 import { PageContainer, PageHeader } from "@/components/common";
 import { ReportsFilters } from "@/components/reports/ReportsFilters";
 import { ReportsTabs } from "@/components/reports/ReportsTabs";
-import { RevenueSummary } from "@/components/reports/RevenueSummary";
-import { RevenueTrendChart } from "@/components/reports/RevenueTrendChart";
-import { PaymentMethodChart } from "@/components/reports/PaymentMethodChart";
-import { RevenueTable } from "@/components/reports/RevenueTable";
-import { RevenueInsights } from "@/components/reports/RevenueInsights";
-import { WorkOrderSummary } from "@/components/reports/WorkOrderSummary";
-import { WorkOrderStatusChart } from "@/components/reports/WorkOrderStatusChart";
-import { WorkOrderTrendChart } from "@/components/reports/WorkOrderTrendChart";
-import { MechanicPerformanceChart } from "@/components/reports/MechanicPerformanceChart";
-import { CompletionTimeCard } from "@/components/reports/CompletionTimeCard";
-import { RecentWorkOrdersTable } from "@/components/reports/RecentWorkOrdersTable";
-import { WorkOrderInsights } from "@/components/reports/WorkOrderInsights";
+import { RevenueReportView } from "@/components/reports/RevenueReportView";
+import { WorkOrdersReportView } from "@/components/reports/WorkOrdersReportView";
+import { InventoryReportView } from "@/components/reports/InventoryReportView";
+import { CustomerAnalyticsView } from "@/components/reports/CustomerAnalyticsView";
+import { ServiceAnalyticsView } from "@/components/reports/ServiceAnalyticsView";
 
 export default function ReportsPage() {
-  const [activeTab, setActiveTab] = useState("work-orders"); // Work Orders is active by default now
+  const [activeTab, setActiveTab] = useState("customers"); // Customers tab active by default
+  const [dateRange, setDateRange] = useState("This Month");
+
+  const getDateRangeParams = (range: string) => {
+    const now = new Date();
+    let startDate: string | null = null;
+    let endDate: string | null = null;
+
+    if (range === "Today") {
+      startDate = now.toISOString().split("T")[0];
+      endDate = now.toISOString().split("T")[0];
+    } else if (range === "Yesterday") {
+      const yesterday = new Date();
+      yesterday.setDate(now.getDate() - 1);
+      startDate = yesterday.toISOString().split("T")[0];
+      endDate = yesterday.toISOString().split("T")[0];
+    } else if (range === "Last 7 Days") {
+      const past = new Date();
+      past.setDate(now.getDate() - 7);
+      startDate = past.toISOString().split("T")[0];
+      endDate = now.toISOString().split("T")[0];
+    } else if (range === "Last 30 Days") {
+      const past = new Date();
+      past.setDate(now.getDate() - 30);
+      startDate = past.toISOString().split("T")[0];
+      endDate = now.toISOString().split("T")[0];
+    } else if (range === "This Month") {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      startDate = startOfMonth.toISOString().split("T")[0];
+      endDate = now.toISOString().split("T")[0];
+    } else if (range === "Last Month") {
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+      startDate = startOfLastMonth.toISOString().split("T")[0];
+      endDate = endOfLastMonth.toISOString().split("T")[0];
+    }
+    return { startDate, endDate };
+  };
+
+  const filters = getDateRangeParams(dateRange);
 
   return (
     <PageContainer>
@@ -30,7 +62,7 @@ export default function ReportsPage() {
       />
 
       {/* Top Filter Bar */}
-      <ReportsFilters />
+      <ReportsFilters dateRange={dateRange} setDateRange={setDateRange} />
 
       {/* Report Category Navigation Tabs */}
       <ReportsTabs activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -38,45 +70,15 @@ export default function ReportsPage() {
       {/* Dynamic Tab Content Area */}
       <div className="pt-2 animate-fadeIn">
         {activeTab === "revenue" ? (
-          <div className="space-y-6">
-            {/* SECTION 1: Revenue Summary */}
-            <RevenueSummary />
-
-            {/* SECTION 2: Revenue Trend Chart */}
-            <RevenueTrendChart />
-
-            {/* SECTION 3 & 5: Payment Method & Insights in a 2-column layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <PaymentMethodChart />
-              <RevenueInsights />
-            </div>
-
-            {/* SECTION 4: Daily Revenue Table */}
-            <RevenueTable />
-          </div>
+          <RevenueReportView filters={filters} />
         ) : activeTab === "work-orders" ? (
-          <div className="space-y-6">
-            {/* SECTION 1: Summary KPI */}
-            <WorkOrderSummary />
-
-            {/* SECTION 2 & 5: Work Order Status & Average Completion Time */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <WorkOrderStatusChart />
-              <CompletionTimeCard />
-            </div>
-
-            {/* SECTION 3: Daily Work Orders Trend */}
-            <WorkOrderTrendChart />
-
-            {/* SECTION 4 & 7: Mechanic Performance & Operational Insights */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <MechanicPerformanceChart />
-              <WorkOrderInsights />
-            </div>
-
-            {/* SECTION 6: Recent Work Orders Table */}
-            <RecentWorkOrdersTable />
-          </div>
+          <WorkOrdersReportView filters={filters} />
+        ) : activeTab === "spare-parts" ? (
+          <InventoryReportView filters={filters} />
+        ) : activeTab === "customers" ? (
+          <CustomerAnalyticsView />
+        ) : activeTab === "services" ? (
+          <ServiceAnalyticsView />
         ) : (
           <div className="bg-white border border-slate-200/80 rounded-2xl p-8 text-center shadow-xs animate-scaleUp">
             <div className="w-12 h-12 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center mx-auto mb-4 text-slate-400">

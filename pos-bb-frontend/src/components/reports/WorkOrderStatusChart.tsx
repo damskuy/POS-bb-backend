@@ -1,14 +1,35 @@
 import React from "react";
-import { woStatuses } from "@/mock/workOrderReport";
 
-export const WorkOrderStatusChart: React.FC = () => {
+interface StatusSummary {
+  pending: number;
+  inProgress: number;
+  completed: number;
+  cancelled: number;
+}
+
+interface WorkOrderStatusChartProps {
+  summary: StatusSummary;
+}
+
+export const WorkOrderStatusChart: React.FC<WorkOrderStatusChartProps> = ({
+  summary,
+}) => {
   const radius = 10;
   const circ = 2 * Math.PI * radius; // 62.8318
+
+  const total = summary.pending + summary.inProgress + summary.completed + summary.cancelled;
+  
+  const woStatuses = [
+    { status: "Pending", count: summary.pending, percentage: total > 0 ? Math.round((summary.pending / total) * 100) : 0, color: "#f59e0b" },
+    { status: "In Progress", count: summary.inProgress, percentage: total > 0 ? Math.round((summary.inProgress / total) * 100) : 0, color: "#3b82f6" },
+    { status: "Completed", count: summary.completed, percentage: total > 0 ? Math.round((summary.completed / total) * 100) : 0, color: "#10b981" },
+    { status: "Cancelled", count: summary.cancelled, percentage: total > 0 ? Math.round((summary.cancelled / total) * 100) : 0, color: "#ef4444" },
+  ];
 
   let accumulatedPercent = 0;
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-5 flex flex-col h-full">
+    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-5 flex flex-col h-full animate-fadeIn">
       {/* Header */}
       <div className="flex items-center gap-2 mb-6 shrink-0">
         <div className="w-6 h-6 bg-purple-50 rounded-lg flex items-center justify-center">
@@ -62,10 +83,10 @@ export const WorkOrderStatusChart: React.FC = () => {
         {/* Legend Right Side */}
         <div className="flex-1 w-full space-y-3.5">
           {woStatuses.map((s) => (
-            <div key={s.status} className="flex items-center justify-between text-xs">
+            <div key={s.status} className="flex items-center justify-between text-xs font-semibold">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                <span className="font-semibold text-slate-700">{s.status}</span>
+                <span className="text-slate-700">{s.status}</span>
               </div>
               <div className="text-right">
                 <span className="font-bold text-slate-900 font-mono">{s.percentage}%</span>
@@ -75,6 +96,11 @@ export const WorkOrderStatusChart: React.FC = () => {
               </div>
             </div>
           ))}
+          {woStatuses.length === 0 && (
+            <p className="text-center text-xs text-slate-400 font-semibold py-8">
+              No orders recorded
+            </p>
+          )}
         </div>
       </div>
     </div>

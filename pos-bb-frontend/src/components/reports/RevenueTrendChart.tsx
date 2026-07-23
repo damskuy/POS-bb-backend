@@ -1,14 +1,26 @@
 "use client";
 
 import React, { useState } from "react";
-import { formatRupiah } from "@/utils/format";
-import { dailyTrend } from "@/mock/revenueReport";
+import { formatRupiah, formatDate } from "@/utils/format";
 
-export const RevenueTrendChart: React.FC = () => {
+interface DailyRevenueItem {
+  date: string;
+  revenue: number;
+}
+
+interface RevenueTrendChartProps {
+  dailyRevenue: DailyRevenueItem[];
+}
+
+export const RevenueTrendChart: React.FC<RevenueTrendChartProps> = ({
+  dailyRevenue,
+}) => {
   const [activePoint, setActivePoint] = useState<{ x: number; y: number; label: string; value: number } | null>(null);
 
-  const maxValue = Math.max(...dailyTrend.map((d) => d.revenue));
-  const minValue = Math.min(...dailyTrend.map((d) => d.revenue));
+  const data = dailyRevenue.length > 0 ? dailyRevenue : [{ date: new Date().toISOString(), revenue: 0 }];
+
+  const maxValue = Math.max(...data.map((d) => d.revenue), 100000);
+  const minValue = 0;
   const range = maxValue - minValue || 1;
 
   const width = 100;
@@ -16,10 +28,10 @@ export const RevenueTrendChart: React.FC = () => {
   const paddingX = 3;
   const paddingY = 4;
 
-  const points = dailyTrend.map((d, i) => {
-    const x = paddingX + (i / (dailyTrend.length - 1)) * (width - paddingX * 2);
+  const points = data.map((d, i) => {
+    const x = paddingX + (i / (data.length - 1)) * (width - paddingX * 2);
     const y = height - paddingY - ((d.revenue - minValue) / range) * (height - paddingY * 2);
-    return { x, y, ...d };
+    return { x, y, label: d.date, revenue: d.revenue };
   });
 
   const pathD = points
@@ -34,7 +46,7 @@ export const RevenueTrendChart: React.FC = () => {
   const areaD = `${pathD} L ${points[points.length - 1].x} ${height - paddingY} L ${points[0].x} ${height - paddingY} Z`;
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-5">
+    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-5 animate-fadeIn">
       {/* Chart Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
@@ -46,7 +58,7 @@ export const RevenueTrendChart: React.FC = () => {
           <h3 className="text-sm font-bold text-slate-900">Revenue Trend</h3>
         </div>
         <span className="text-xs font-semibold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg border border-slate-200">
-          Last 30 Days
+          Historical Daily Chart
         </span>
       </div>
 
@@ -55,8 +67,8 @@ export const RevenueTrendChart: React.FC = () => {
         {/* Y Axis Guide */}
         <div className="absolute left-0 top-1 bottom-8 flex flex-col justify-between pointer-events-none text-[9px] font-mono text-slate-400 select-none">
           <span>{(maxValue / 1000000).toFixed(1)}jt</span>
-          <span>{((minValue + range / 2) / 1000000).toFixed(1)}jt</span>
-          <span>{(minValue / 1000000).toFixed(1)}jt</span>
+          <span>{((maxValue / 2) / 1000000).toFixed(1)}jt</span>
+          <span>0jt</span>
         </div>
 
         {/* SVG Drawing Canvas */}
@@ -67,7 +79,7 @@ export const RevenueTrendChart: React.FC = () => {
             onMouseLeave={() => setActivePoint(null)}
           >
             {/* Background Grid Lines */}
-            {[0.25, 0.5, 0.75].map((f) => (
+            {[0, 0.25, 0.5, 0.75, 1].map((f) => (
               <line
                 key={f}
                 x1={paddingX}
@@ -75,7 +87,7 @@ export const RevenueTrendChart: React.FC = () => {
                 x2={width - paddingX}
                 y2={paddingY + f * (height - paddingY * 2)}
                 stroke="#f1f5f9"
-                strokeWidth="0.3"
+                strokeWidth="0.2"
               />
             ))}
 
@@ -89,7 +101,7 @@ export const RevenueTrendChart: React.FC = () => {
             <path d={areaD} fill="url(#trendGrad)" />
 
             {/* Line Path */}
-            <path d={pathD} fill="none" stroke="#2563eb" strokeWidth="0.7" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={pathD} fill="none" stroke="#2563eb" strokeWidth="0.6" strokeLinecap="round" strokeLinejoin="round" />
 
             {/* Mouse Tracking Points */}
             {points.map((p, i) => (
@@ -97,10 +109,10 @@ export const RevenueTrendChart: React.FC = () => {
                 <circle
                   cx={p.x}
                   cy={p.y}
-                  r="1.2"
+                  r="0.8"
                   fill="white"
                   stroke="#2563eb"
-                  strokeWidth="0.6"
+                  strokeWidth="0.4"
                   style={{ cursor: "pointer" }}
                   onMouseEnter={(e) => {
                     const svgEl = (e.target as SVGElement).closest("svg");
@@ -126,17 +138,15 @@ export const RevenueTrendChart: React.FC = () => {
               className="absolute pointer-events-none z-10 bg-slate-900 text-white text-[10px] font-semibold rounded-lg px-2.5 py-1.5 shadow-xl whitespace-nowrap -translate-x-1/2 -translate-y-full -mt-2.5 transition-all"
               style={{ left: activePoint.x, top: activePoint.y }}
             >
-              <p className="text-slate-300 font-normal">{activePoint.label}</p>
+              <p className="text-slate-300 font-normal">{formatDate(activePoint.label)}</p>
               <p className="font-mono font-bold text-emerald-400">{formatRupiah(activePoint.value)}</p>
             </div>
           )}
 
           {/* X Axis Time Guide */}
           <div className="flex justify-between border-t border-slate-200/60 pt-2.5 text-[9px] font-semibold text-slate-400 select-none">
-            <span>Day 1</span>
-            <span>Day 10</span>
-            <span>Day 20</span>
-            <span>Day 30</span>
+            <span>{data.length > 0 ? formatDate(data[0].date) : "Start"}</span>
+            <span>{data.length > 1 ? formatDate(data[data.length - 1].date) : "End"}</span>
           </div>
         </div>
       </div>

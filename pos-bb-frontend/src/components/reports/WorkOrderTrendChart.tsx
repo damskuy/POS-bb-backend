@@ -1,13 +1,26 @@
 "use client";
 
 import React, { useState } from "react";
-import { woTrend } from "@/mock/workOrderReport";
 
-export const WorkOrderTrendChart: React.FC = () => {
+interface DailyTrendItem {
+  date: string;
+  label: string;
+  count: number;
+}
+
+interface WorkOrderTrendChartProps {
+  dailyTrend: DailyTrendItem[];
+}
+
+export const WorkOrderTrendChart: React.FC<WorkOrderTrendChartProps> = ({
+  dailyTrend,
+}) => {
   const [activePoint, setActivePoint] = useState<{ x: number; y: number; label: string; value: number } | null>(null);
 
-  const maxValue = Math.max(...woTrend.map((d) => d.count));
-  const minValue = Math.min(...woTrend.map((d) => d.count));
+  const data = dailyTrend.length > 0 ? dailyTrend : [{ date: new Date().toISOString(), label: "Today", count: 0 }];
+
+  const maxValue = Math.max(...data.map((d) => d.count), 5);
+  const minValue = 0;
   const range = maxValue - minValue || 1;
 
   const width = 100;
@@ -15,10 +28,10 @@ export const WorkOrderTrendChart: React.FC = () => {
   const paddingX = 3;
   const paddingY = 4;
 
-  const points = woTrend.map((d, i) => {
-    const x = paddingX + (i / (woTrend.length - 1)) * (width - paddingX * 2);
+  const points = data.map((d, i) => {
+    const x = paddingX + (i / (data.length - 1)) * (width - paddingX * 2);
     const y = height - paddingY - ((d.count - minValue) / range) * (height - paddingY * 2);
-    return { x, y, ...d };
+    return { x, y, label: d.label, count: d.count };
   });
 
   const pathD = points
@@ -33,7 +46,7 @@ export const WorkOrderTrendChart: React.FC = () => {
   const areaD = `${pathD} L ${points[points.length - 1].x} ${height - paddingY} L ${points[0].x} ${height - paddingY} Z`;
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-5">
+    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-5 animate-fadeIn">
       {/* Chart Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
@@ -54,8 +67,8 @@ export const WorkOrderTrendChart: React.FC = () => {
         {/* Y Axis Guide */}
         <div className="absolute left-0 top-1 bottom-8 flex flex-col justify-between pointer-events-none text-[9px] font-mono text-slate-400 select-none">
           <span>{maxValue} orders</span>
-          <span>{Math.round(minValue + range / 2)} orders</span>
-          <span>{minValue} orders</span>
+          <span>{Math.round(maxValue / 2)} orders</span>
+          <span>0 orders</span>
         </div>
 
         {/* SVG Drawing Canvas */}
@@ -66,7 +79,7 @@ export const WorkOrderTrendChart: React.FC = () => {
             onMouseLeave={() => setActivePoint(null)}
           >
             {/* Background Grid Lines */}
-            {[0.25, 0.5, 0.75].map((f) => (
+            {[0, 0.25, 0.5, 0.75, 1].map((f) => (
               <line
                 key={f}
                 x1={paddingX}
@@ -74,7 +87,7 @@ export const WorkOrderTrendChart: React.FC = () => {
                 x2={width - paddingX}
                 y2={paddingY + f * (height - paddingY * 2)}
                 stroke="#f1f5f9"
-                strokeWidth="0.3"
+                strokeWidth="0.2"
               />
             ))}
 
@@ -88,7 +101,7 @@ export const WorkOrderTrendChart: React.FC = () => {
             <path d={areaD} fill="url(#woTrendGrad)" />
 
             {/* Line Path */}
-            <path d={pathD} fill="none" stroke="#2563eb" strokeWidth="0.7" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={pathD} fill="none" stroke="#2563eb" strokeWidth="0.6" strokeLinecap="round" strokeLinejoin="round" />
 
             {/* Mouse Tracking Points */}
             {points.map((p, i) => (
@@ -96,10 +109,10 @@ export const WorkOrderTrendChart: React.FC = () => {
                 <circle
                   cx={p.x}
                   cy={p.y}
-                  r="1.2"
+                  r="0.8"
                   fill="white"
                   stroke="#2563eb"
-                  strokeWidth="0.6"
+                  strokeWidth="0.4"
                   style={{ cursor: "pointer" }}
                   onMouseEnter={(e) => {
                     const svgEl = (e.target as SVGElement).closest("svg");
@@ -132,10 +145,8 @@ export const WorkOrderTrendChart: React.FC = () => {
 
           {/* X Axis Time Guide */}
           <div className="flex justify-between border-t border-slate-200/60 pt-2.5 text-[9px] font-semibold text-slate-400 select-none">
-            <span>Day 1</span>
-            <span>Day 10</span>
-            <span>Day 20</span>
-            <span>Day 30</span>
+            <span>{data.length > 0 ? data[0].label : "Start"}</span>
+            <span>{data.length > 1 ? data[data.length - 1].label : "End"}</span>
           </div>
         </div>
       </div>

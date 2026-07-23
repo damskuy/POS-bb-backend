@@ -1,9 +1,20 @@
 import React from "react";
-import { completionTime } from "@/mock/workOrderReport";
 
-export const CompletionTimeCard: React.FC = () => {
+interface CompletionTimeItem {
+  average: string;
+  fastest: string;
+  longest: string;
+}
+
+interface CompletionTimeCardProps {
+  completionTime: CompletionTimeItem;
+}
+
+export const CompletionTimeCard: React.FC<CompletionTimeCardProps> = ({
+  completionTime,
+}) => {
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-5 flex flex-col justify-between h-full">
+    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-5 flex flex-col justify-between h-full animate-fadeIn">
       {/* Header */}
       <div className="flex items-center gap-2 mb-6 shrink-0">
         <div className="w-6 h-6 bg-blue-50 rounded-lg flex items-center justify-center">

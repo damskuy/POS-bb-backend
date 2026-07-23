@@ -65,42 +65,54 @@ export const MechanicTable: React.FC<MechanicTableProps> = ({
   }
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs relative transition-all">
+    <div className="relative">
       {/* Top Loading Progress Bar */}
       {isFetching && (
-        <div className="absolute top-0 left-0 right-0 h-1 bg-blue-600/30 overflow-hidden z-20">
-          <div className="h-full bg-blue-600 animate-pulse w-full" />
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-slate-200 overflow-hidden z-20">
+          <div className="h-full bg-slate-900 animate-pulse w-full" />
         </div>
       )}
 
       <div className={`overflow-x-auto transition-opacity duration-200 ${isFetching ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
-        <table className="w-full text-left border-collapse">
+        <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              <th className="py-3.5 px-4 sm:px-6">Nama</th>
-              <th className="py-3.5 px-4">Nomor HP</th>
-              <th className="py-3.5 px-4 text-center">Status</th>
-              <th className="py-3.5 px-4">Keahlian & Alamat</th>
-              <th className="py-3.5 px-4">Terdaftar</th>
-              <th className="py-3.5 px-4 sm:px-6 text-right">Aksi</th>
+            <tr className="bg-slate-50/50 border-b border-slate-200/80">
+              <th className="text-left px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Nama</th>
+              <th className="text-left px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Nomor HP</th>
+              <th className="text-center px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
+              <th className="text-left px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Keahlian & Alamat</th>
+              <th className="text-left px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Terdaftar</th>
+              <th className="px-6 py-4 text-right"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 text-sm font-medium text-slate-700 animate-fadeIn">
+          <tbody className="divide-y divide-slate-100">
             {mechanics.map((mechanic) => {
               const isActive = mechanic.status !== "Inactive";
+              
+              // Generate initials for avatar
+              const initials = mechanic.name
+                ? mechanic.name
+                    .split(" ")
+                    .filter(Boolean)
+                    .map((n) => n[0])
+                    .slice(0, 2)
+                    .join("")
+                    .toUpperCase()
+                : "M";
+
               return (
                 <tr
                   key={mechanic.id}
-                  className="hover:bg-slate-50/60 transition-colors group"
+                  className="group hover:bg-slate-50/60 transition-colors"
                 >
                   {/* Name */}
-                  <td className="py-4 px-4 sm:px-6">
+                  <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-blue-50 text-blue-600 font-bold text-xs rounded-full flex items-center justify-center border border-blue-100 shrink-0 uppercase">
-                        {mechanic.name.slice(0, 2)}
+                      <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-sm">
+                        {initials}
                       </div>
                       <div>
-                        <p className="font-bold text-slate-900 text-xs sm:text-sm">
+                        <p className="font-bold text-slate-900 text-sm">
                           {mechanic.name}
                         </p>
                       </div>
@@ -108,19 +120,19 @@ export const MechanicTable: React.FC<MechanicTableProps> = ({
                   </td>
 
                   {/* Phone */}
-                  <td className="py-4 px-4">
-                    <span className="font-mono text-xs text-slate-700 font-medium">
+                  <td className="px-6 py-4">
+                    <span className="font-mono text-xs text-slate-800 font-semibold">
                       {mechanic.phone}
                     </span>
                   </td>
 
                   {/* Status Badge */}
-                  <td className="py-4 px-4 text-center">
+                  <td className="px-6 py-4 text-center">
                     <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
                         isActive
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                          : "bg-slate-100 text-slate-600 border-slate-200"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                          : "bg-slate-100 text-slate-800 border-slate-200/60"
                       }`}
                     >
                       <span
@@ -133,13 +145,13 @@ export const MechanicTable: React.FC<MechanicTableProps> = ({
                   </td>
 
                   {/* Skills & Address */}
-                  <td className="py-4 px-4">
+                  <td className="px-6 py-4">
                     <div>
-                      <p className="text-xs font-semibold text-slate-800">
+                      <p className="text-sm font-semibold text-slate-800">
                         {mechanic.skills || "Umum (General)"}
                       </p>
                       {mechanic.address && (
-                        <p className="text-[11px] text-slate-400 truncate max-w-xs">
+                        <p className="text-[11px] text-slate-400 truncate max-w-xs mt-0.5">
                           {mechanic.address}
                         </p>
                       )}
@@ -147,37 +159,37 @@ export const MechanicTable: React.FC<MechanicTableProps> = ({
                   </td>
 
                   {/* Date */}
-                  <td className="py-4 px-4 text-xs text-slate-500 font-normal">
+                  <td className="px-6 py-4 font-mono text-xs text-slate-500">
                     {formatDate(mechanic.createdAt)}
                   </td>
 
                   {/* Actions */}
-                  <td className="py-4 px-4 sm:px-6 text-right">
+                  <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => onEdit(mechanic)}
-                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                         title="Edit Mekanik"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            strokeWidth={2}
+                            strokeWidth={1.5}
                             d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                           />
                         </svg>
                       </button>
                       <button
                         onClick={() => onDelete(mechanic)}
-                        className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                         title="Hapus Mekanik"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            strokeWidth={2}
+                            strokeWidth={1.5}
                             d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                           />
                         </svg>

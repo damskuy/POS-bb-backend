@@ -1,5 +1,4 @@
 import React from "react";
-import { woSummary } from "@/mock/workOrderReport";
 
 interface KpiCardProps {
   title: string;
@@ -63,16 +62,28 @@ const KpiCard: React.FC<KpiCardProps> = ({
   );
 };
 
-export const WorkOrderSummary: React.FC = () => {
+interface WorkOrderSummaryProps {
+  summary: {
+    pending: number;
+    inProgress: number;
+    completed: number;
+    cancelled: number;
+  };
+}
+
+export const WorkOrderSummary: React.FC<WorkOrderSummaryProps> = ({
+  summary,
+}) => {
+  const totalWO = summary.pending + summary.inProgress + summary.completed + summary.cancelled;
+  const completionRate = totalWO > 0 ? Math.round((summary.completed / totalWO) * 100) : 0;
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fadeIn">
       {/* Card 1: Total Work Orders */}
       <KpiCard
         title="Total Work Orders"
-        value={woSummary.totalWO}
-        change={woSummary.totalWOChange}
-        isPositive={true}
-        comparisonText="vs previous period"
+        value={totalWO}
+        comparisonText="Total created"
         iconBg="bg-blue-50"
         iconColor="text-blue-600"
         icon={
@@ -85,8 +96,8 @@ export const WorkOrderSummary: React.FC = () => {
       {/* Card 2: Completed */}
       <KpiCard
         title="Completed"
-        value={woSummary.completed}
-        comparisonText={`Completion Rate: ${woSummary.completionRate}`}
+        value={summary.completed}
+        comparisonText={`Completion Rate: ${completionRate}%`}
         iconBg="bg-emerald-50"
         iconColor="text-emerald-600"
         icon={
@@ -99,7 +110,8 @@ export const WorkOrderSummary: React.FC = () => {
       {/* Card 3: In Progress */}
       <KpiCard
         title="In Progress"
-        value={woSummary.inProgress}
+        value={summary.inProgress}
+        comparisonText="Currently actively worked"
         iconBg="bg-sky-50"
         iconColor="text-sky-600"
         icon={
@@ -109,10 +121,11 @@ export const WorkOrderSummary: React.FC = () => {
         }
       />
 
-      {/* Card 4: Waiting */}
+      {/* Card 4: Waiting Queue */}
       <KpiCard
-        title="Waiting"
-        value={woSummary.waiting}
+        title="Waiting Queue"
+        value={summary.pending}
+        comparisonText="Pending assignment"
         iconBg="bg-amber-50"
         iconColor="text-amber-600"
         icon={

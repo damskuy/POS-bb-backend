@@ -29,28 +29,46 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({
       href={href}
       onClick={onClick}
       title={isCollapsed ? label : undefined}
-      className={`relative group flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 ${
+      className={`relative group flex items-center gap-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 ease-in-out cursor-pointer ${
+        isCollapsed ? "px-2 justify-center" : "pl-3.5 pr-3"
+      } ${
         isActive
-          ? "bg-blue-50 text-blue-600 font-semibold shadow-2xs"
-          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
-      } ${isCollapsed ? "justify-center px-2" : ""}`}
+          ? "bg-white/[0.06] text-white font-semibold shadow-xs"
+          : "text-[#94A3B8] hover:text-[#CBD5E1] hover:bg-white/[0.03] hover:pl-[17px]"
+      }`}
     >
+      {/* Thin left accent bar for active menu item */}
+      {isActive && !isCollapsed && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-white rounded-r-md" />
+      )}
+
+      {/* Icon with slight movement on hover */}
       <span
-        className={`w-5 h-5 flex items-center justify-center shrink-0 transition-colors ${
-          isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
+        className={`w-[21px] h-[21px] flex items-center justify-center shrink-0 transition-all duration-300 ease-in-out group-hover:translate-x-[1.5px] ${
+          isActive ? "text-white" : "text-[#94A3B8] group-hover:text-[#CBD5E1]"
         }`}
       >
         {icon}
       </span>
 
-      {!isCollapsed && <span className="truncate">{label}</span>}
+      {/* Smoothly animated text label */}
+      <span
+        className={`truncate tracking-wide transition-all duration-300 ease-in-out whitespace-nowrap ${
+          isCollapsed ? "w-0 opacity-0 pointer-events-none translate-x-2" : "w-auto opacity-100 translate-x-0"
+        }`}
+      >
+        {label}
+      </span>
 
-      {!isCollapsed && badge !== undefined && (
+      {/* Smoothly animated badge */}
+      {badge !== undefined && (
         <span
-          className={`ml-auto px-2 py-0.5 text-xs font-semibold rounded-full ${
+          className={`ml-auto px-2 py-0.5 text-[10px] font-bold rounded-full transition-all duration-300 ease-in-out ${
+            isCollapsed ? "w-0 opacity-0 scale-75 pointer-events-none" : "w-auto opacity-100 scale-100"
+          } ${
             isActive
-              ? "bg-blue-100 text-blue-700"
-              : "bg-slate-100 text-slate-600 group-hover:bg-slate-200"
+              ? "bg-white/10 text-white"
+              : "bg-white/5 text-[#94A3B8] group-hover:bg-white/10 group-hover:text-[#CBD5E1]"
           }`}
         >
           {badge}
