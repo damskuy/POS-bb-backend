@@ -186,7 +186,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               label="Work Orders"
               isCollapsed={isCollapsed}
               onClick={onCloseMobile}
-              badge="Active"
               icon={
                 <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path

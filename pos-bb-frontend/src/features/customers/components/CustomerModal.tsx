@@ -93,43 +93,47 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
+      {/* Backdrop Overlay */}
       <div
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-fadeIn"
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity animate-fadeIn"
         onClick={onClose}
       />
 
-      {/* Modal Box */}
-      <div className="relative w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-2xl z-10 overflow-hidden animate-scaleUp">
+      {/* Modal Container */}
+      <div className="relative w-full max-w-md bg-white border border-slate-100 rounded-2xl shadow-2xl z-10 overflow-hidden animate-scaleUp">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-blue-50 border border-blue-100 text-blue-600 rounded-xl flex items-center justify-center font-bold">
+            {/* Icon Badge */}
+            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-800">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth={2}
+                  strokeWidth={1.8}
                   d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                 />
               </svg>
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900">
+              <h3 className="font-bold text-slate-900 text-lg tracking-tight">
                 {isEditing ? "Edit Data Pelanggan" : "Tambah Pelanggan Baru"}
               </h3>
-              <p className="text-xs text-slate-500 font-normal">
+              <p className="text-slate-500 text-xs mt-0.5">
                 {isEditing
                   ? "Perbarui informasi kontak pelanggan"
                   : "Isi formulir untuk menambahkan pelanggan baru"}
               </p>
             </div>
           </div>
+          {/* Close Button */}
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+            className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors flex items-center justify-center"
           >
-            &times;
+            <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
@@ -145,10 +149,10 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
               value={formData.name}
               onChange={(e) => handleChange("name", e.target.value)}
               placeholder="Contoh: Budi Santoso"
-              className={`w-full px-3.5 py-2 bg-white border rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
+              className={`w-full px-3.5 py-2.5 bg-slate-50/60 border rounded-xl text-sm text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:bg-white focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all ${
                 errors.name
                   ? "border-rose-400 focus:ring-rose-500/20"
-                  : "border-slate-200 focus:border-blue-600 focus:ring-blue-500/20"
+                  : "border-slate-200"
               }`}
             />
             {errors.name && (
@@ -166,10 +170,10 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
               value={formData.phone}
               onChange={(e) => handleChange("phone", e.target.value)}
               placeholder="Contoh: 081234567890"
-              className={`w-full px-3.5 py-2 bg-white border rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
+              className={`w-full px-3.5 py-2.5 bg-slate-50/60 border rounded-xl text-sm text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:bg-white focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all ${
                 errors.phone
                   ? "border-rose-400 focus:ring-rose-500/20"
-                  : "border-slate-200 focus:border-blue-600 focus:ring-blue-500/20"
+                  : "border-slate-200"
               }`}
             />
             {errors.phone && (
@@ -183,11 +187,11 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
               Alamat Lengkap
             </label>
             <textarea
-              rows={2}
+              rows={3}
               value={formData.address}
               onChange={(e) => handleChange("address", e.target.value)}
               placeholder="Contoh: Jl. Sudirman No. 45, Jakarta"
-              className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all resize-none"
+              className="w-full px-3.5 py-2.5 bg-slate-50/60 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:bg-white focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all resize-none"
             />
           </div>
 
@@ -201,7 +205,7 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
               value={formData.notes}
               onChange={(e) => handleChange("notes", e.target.value)}
               placeholder="Contoh: Pelanggan langganan servis rutin"
-              className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all"
+              className="w-full px-3.5 py-2.5 bg-slate-50/60 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:bg-white focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all"
             />
           </div>
 
@@ -211,18 +215,18 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors disabled:opacity-50"
+              className="text-xs font-medium text-slate-600 hover:text-slate-900 px-4 py-2.5 transition-colors disabled:opacity-50"
             >
               Batal
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors flex items-center gap-2 disabled:opacity-50 shadow-xs"
+              className="bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-sm hover:shadow transition-all flex items-center gap-2 disabled:opacity-50"
             >
               {submitting ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   <span>Menyimpan...</span>
                 </>
               ) : (

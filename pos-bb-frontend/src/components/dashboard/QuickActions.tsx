@@ -4,7 +4,6 @@ import Link from "next/link";
 const actions = [
   { label: "New Work Order", href: "/work-orders/new", primary: true },
   { label: "New Customer", href: "/customers" },
-  { label: "Create Invoice", href: "/invoices" },
 ];
 
 export const QuickActions: React.FC = () => {

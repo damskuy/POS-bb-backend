@@ -288,8 +288,7 @@ export default function NewWorkOrderPage() {
     }
     setSubmitting(true);
     try {
-      // Prepend priority level to the customer complaint for backend storage
-      const finalComplaint = complaint ? `[Prioritas: ${priority}] ${complaint}` : `[Prioritas: ${priority}]`;
+      const finalComplaint = complaint || "";
 
       const input: WorkOrderInput = {
         customerId: customer.id,
@@ -443,27 +442,39 @@ export default function NewWorkOrderPage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={customerQuery}
-                          onChange={(e) => setCustomerQuery(e.target.value)}
-                          placeholder="Ketik nama pelanggan atau nomor handphone..."
-                          className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-200 transition-all shadow-3xs"
-                        />
-                        <svg
-                          className="w-4.5 h-4.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={1.8}
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      <div className="flex gap-3">
+                        <div className="relative flex-1">
+                          <input
+                            type="text"
+                            value={customerQuery}
+                            onChange={(e) => setCustomerQuery(e.target.value)}
+                            placeholder="Ketik nama pelanggan atau nomor handphone..."
+                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-200 transition-all shadow-3xs"
                           />
-                        </svg>
+                          <svg
+                            className="w-4.5 h-4.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1.8}
+                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                            />
+                          </svg>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowCreateCustomer(true)}
+                          className="px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                          </svg>
+                          Tambah Pelanggan Baru
+                        </button>
                       </div>
 
                       {loadingCustomers ? (
@@ -616,53 +627,20 @@ export default function NewWorkOrderPage() {
                 <div className="space-y-6">
                   <div>
                     <h2 className="text-base font-extrabold text-slate-900">Detail Keluhan & Pekerjaan</h2>
-                    <p className="text-xs text-slate-500 mt-1">Masukkan odometer kendaraan, prioritas, keluhan, dan tunjuk mekanik yang bertugas.</p>
+                    <p className="text-xs text-slate-500 mt-1">Masukkan odometer kendaraan, keluhan, dan tunjuk mekanik yang bertugas.</p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
                     {/* Odometer */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Odometer Saat Ini (km)</label>
-                      <input
-                        type="number"
-                        value={odometer}
-                        onChange={(e) => setOdometer(e.target.value)}
-                        placeholder="Contoh: 45000"
-                        min={0}
-                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-200 transition-all shadow-3xs"
-                      />
-                    </div>
-
-                    {/* Priority Selector */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Prioritas Pekerjaan</label>
-                      <div className="flex gap-2">
-                        {(["NORMAL", "HIGH", "EMERGENCY"] as const).map((p) => {
-                          const isSelected = priority === p;
-                          const activeStyles =
-                            p === "EMERGENCY"
-                              ? "bg-rose-500 border-rose-500 text-white font-bold"
-                              : p === "HIGH"
-                              ? "bg-amber-500 border-amber-500 text-white font-bold"
-                              : "bg-slate-900 border-slate-900 text-white font-bold";
-
-                          return (
-                            <button
-                              key={p}
-                              type="button"
-                              onClick={() => setPriority(p)}
-                              className={`flex-1 py-2 rounded-xl text-[10px] font-extrabold border transition-all cursor-pointer ${
-                                isSelected
-                                  ? activeStyles
-                                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                              }`}
-                            >
-                              {p}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Odometer Saat Ini (km)</label>
+                    <input
+                      type="number"
+                      value={odometer}
+                      onChange={(e) => setOdometer(e.target.value)}
+                      placeholder="Contoh: 45000"
+                      min={0}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-200 transition-all shadow-3xs"
+                    />
                   </div>
 
                   {/* Mechanic dropdown */}
@@ -994,20 +972,7 @@ export default function NewWorkOrderPage() {
                             <span className="text-slate-400">Mekanik:</span>
                             <span className="font-bold text-slate-800">{mechanic?.name || "Belum ditentukan"}</span>
                           </div>
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-slate-400">Prioritas:</span>
-                            <span
-                              className={`px-2 py-0.5 rounded text-[9px] font-black border ${
-                                priority === "EMERGENCY"
-                                  ? "bg-rose-50 text-rose-700 border-rose-200"
-                                  : priority === "HIGH"
-                                  ? "bg-amber-50 text-amber-700 border-amber-200"
-                                  : "bg-slate-50 text-slate-700 border-slate-200"
-                              }`}
-                            >
-                              {priority}
-                            </span>
-                          </div>
+
                         </div>
                       </div>
 
@@ -1098,10 +1063,7 @@ export default function NewWorkOrderPage() {
                     <p className="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5">ESTIMASI PREVIEW</p>
                   </div>
                 </div>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
-                  REALTIME
-                </span>
+
               </div>
 
               <div className="space-y-4 max-h-[320px] overflow-y-auto pr-1.5 custom-scrollbar">
@@ -1132,9 +1094,6 @@ export default function NewWorkOrderPage() {
                 <div>
                   <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Detail Pekerjaan</h4>
                   <div className="mt-1 space-y-1">
-                    <p className="text-xs text-slate-100 leading-snug">
-                      <span className="text-slate-400">Prioritas:</span> {priority}
-                    </p>
                     {mechanic && (
                       <p className="text-xs text-slate-100 leading-snug">
                         <span className="text-slate-400">Mekanik:</span> {mechanic.name}
