@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { useServices } from "@/hooks/useServices";
 import { PageContainer, PageHeader, SortByDate } from "@/components/common";
 import { CustomerPagination } from "@/features/customers";
@@ -14,6 +15,9 @@ import {
 import { Service, ServiceInput } from "@/types/service";
 
 export default function ServicesPage() {
+  const { user } = useAuth();
+  const isMechanic = user?.role === "MECHANIC";
+
   const {
     services,
     loading,
@@ -76,15 +80,17 @@ export default function ServicesPage() {
         title="Daftar Jasa Servis"
         subtitle="Kelola katalog tarif jasa servis bengkel, estimasi durasi pekerjaan, dan status keaktifan."
         action={
-          <button
-            onClick={handleOpenAddModal}
-            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 4v16m8-8H4" />
-            </svg>
-            <span>Tambah Servis</span>
-          </button>
+          !isMechanic ? (
+            <button
+              onClick={handleOpenAddModal}
+              className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>Tambah Servis</span>
+            </button>
+          ) : undefined
         }
       />
 
@@ -111,7 +117,8 @@ export default function ServicesPage() {
           isFetching={isFetching}
           onEdit={handleOpenEditModal}
           onDelete={handleOpenDeleteDialog}
-          onAddClick={handleOpenAddModal}
+          onAddClick={!isMechanic ? handleOpenAddModal : undefined}
+          canManage={!isMechanic}
         />
         <CustomerPagination
           page={page}

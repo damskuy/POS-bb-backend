@@ -33,7 +33,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-50 via-indigo-50/30 to-slate-100">
+    <main className="min-h-screen w-full">
       <LoginForm />
     </main>
   );

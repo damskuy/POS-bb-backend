@@ -12,6 +12,7 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
   setDateRange,
 }) => {
   const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
 
   const dateRanges = [
     "Today",
@@ -23,36 +24,68 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
   ];
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between pb-1 animate-fadeIn">
+    <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between pb-1 animate-fadeIn relative z-30">
       {/* Filter Selectors Group */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 max-w-lg">
         {/* Date Range Selector */}
-        <div className="relative">
+        <div className="relative z-20">
           <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
             Periode
           </label>
           <div className="relative">
-            <select
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
-              className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all cursor-pointer appearance-none animate-fadeIn"
+            <button
+              type="button"
+              onClick={() => setShowDateDropdown(!showDateDropdown)}
+              className="w-full text-left pl-9 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all cursor-pointer shadow-xs flex items-center justify-between"
             >
-              {dateRanges.map((range) => (
-                <option key={range} value={range}>
-                  {range}
-                </option>
-              ))}
-            </select>
-            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-400">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
+              <div className="flex items-center">
+                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <span>{dateRange}</span>
+              </div>
+              <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-400">
+                <svg className={`w-4 h-4 transition-transform ${showDateDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </button>
+
+            {/* Custom Dropdown Menu */}
+            {showDateDropdown && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowDateDropdown(false)}
+                />
+                <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1 overflow-hidden animate-scaleUp">
+                  {dateRanges.map((range) => (
+                    <button
+                      key={range}
+                      type="button"
+                      onClick={() => {
+                        setDateRange(range);
+                        setShowDateDropdown(false);
+                      }}
+                      className={`w-full px-4 py-2 text-left text-sm font-semibold transition-colors flex items-center justify-between ${
+                        dateRange === range 
+                          ? "bg-blue-50 text-blue-700" 
+                          : "text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      {range}
+                      {dateRange === range && (
+                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

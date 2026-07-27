@@ -14,8 +14,8 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   action,
 }) => {
   return (
-    <div className="min-h-[380px] flex flex-col items-center justify-center p-8 bg-white border border-slate-200/80 rounded-2xl shadow-xs text-center">
-      <div className="w-16 h-16 bg-slate-50 border border-slate-100 text-slate-400 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
+    <div className="min-h-[380px] flex flex-col items-center justify-center p-8 bg-white border border-slate-200/60 rounded-2xl shadow-xs text-center animate-fadeIn">
+      <div className="w-16 h-16 bg-slate-50 border border-slate-100 text-slate-400 rounded-2xl flex items-center justify-center mb-5">
         {icon || (
           <svg
             className="w-8 h-8"
@@ -32,9 +32,10 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           </svg>
         )}
       </div>
-      <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-      <p className="mt-1 text-sm text-slate-500 max-w-md">{description}</p>
+      <h3 className="text-card-title">{title}</h3>
+      <p className="mt-2 text-secondary max-w-sm">{description}</p>
       {action && <div className="mt-6">{action}</div>}
     </div>
   );
 };
+
