@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma db push && next build",
+    "build": "next build",
     "postinstall": "prisma generate",
-    "start": "next start",
+    "start": "prisma db push && next start",
     "lint": "eslint",
     "test:api": "node scripts/run-tests.js",
     "test": "vitest",
