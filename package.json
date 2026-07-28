@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npx next build",
+    "build": "next build",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
@@ -13,9 +13,6 @@
     "test:run": "vitest run",
     "test:watch": "vitest --watch",
     "coverage": "vitest run --coverage",
-    "seed": "prisma db seed"
-  },
-  "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
