@@ -109,8 +109,8 @@ export async function POST(request: Request) {
       },
     });
 
-  } catch (err) {
-    console.error(err);
-    return error("Internal Server Error");
+  } catch (err: any) {
+    console.error("LOGIN_ERROR:", err);
+    return error(err?.message || "Internal Server Error", 500);
   }
 }
