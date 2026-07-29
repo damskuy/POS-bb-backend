@@ -91,6 +91,13 @@ export const AuthService = {
    * Complete logout procedure (removes token and user data).
    */
   logout(): void {
-    this.removeToken();
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(STORAGE_KEYS.TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.USER);
+      // Also clear any legacy keys
+      localStorage.removeItem("token");
+      localStorage.removeItem("auth_token");
+    }
   },
+
 };

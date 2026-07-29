@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Plus,
   Search,
@@ -25,25 +25,34 @@ import {
   Radio,
   MessageSquare,
   Save,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
+import { ReminderRule, ReminderCategory, ReminderTriggerType } from "@/types/reminderRule";
+import { ReminderRuleService } from "@/services/reminderRule.service";
 
+// ── Local UI state shape that mirrors ReminderRule but keeps the
+//    AutomationItem fields the UI already uses (useDays, useKm flags).
 interface AutomationItem {
-  id: string;
+  // persisted fields
+  id: number | null; // null when not yet saved to DB
   name: string;
-  category: "Servis" | "Perawatan" | "Ban" | "Kelistrikan" | "Rem";
-  triggerText: string;
+  category: ReminderCategory;
+  triggerType: ReminderTriggerType;
   daysInterval: number;
   kmInterval: number;
   useDays: boolean;
   useKm: boolean;
   isActive: boolean;
-  targetCustomers: string[];
   sendTime: string;
   timezone: string;
   sendDays: string;
   skipHolidays: boolean;
   retryOnFailure: boolean;
   messageTemplate: string;
+  // UI-only helpers
+  localId: string; // stable key for React lists
+  triggerText: string;
 }
 
 interface CustomerSample {
@@ -56,6 +65,54 @@ interface CustomerSample {
   lastServiceDate: string;
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function categoryFromApi(cat: ReminderCategory): ReminderCategory {
+  return cat;
+}
+
+function triggerTypeFromFlags(useDays: boolean, useKm: boolean): ReminderTriggerType {
+  if (useDays && useKm) return "BOTH";
+  if (useKm) return "KM";
+  return "DAYS";
+}
+
+function fromApiRule(rule: ReminderRule): AutomationItem {
+  const useDays = rule.triggerType === "DAYS" || rule.triggerType === "BOTH";
+  const useKm = rule.triggerType === "KM" || rule.triggerType === "BOTH";
+  const item: AutomationItem = {
+    id: rule.id,
+    name: rule.name,
+    category: rule.category,
+    triggerType: rule.triggerType,
+    daysInterval: rule.daysInterval ?? 30,
+    kmInterval: rule.kmInterval ?? 3000,
+    useDays,
+    useKm,
+    isActive: rule.isActive,
+    sendTime: rule.sendTime,
+    timezone: rule.timezone,
+    sendDays: rule.sendDays,
+    skipHolidays: rule.skipHolidays,
+    retryOnFailure: rule.retryOnFailure,
+    messageTemplate: rule.messageTemplate,
+    localId: `rule-${rule.id}`,
+    triggerText: "",
+  };
+  item.triggerText = getTriggerTextFromItem(item);
+  return item;
+}
+
+function getTriggerTextFromItem(item: AutomationItem): string {
+  if (item.useDays && item.useKm) {
+    return `${item.daysInterval} hari / ${item.kmInterval.toLocaleString()} KM`;
+  }
+  if (item.useDays) return `${item.daysInterval} hari sebelum jatuh tempo`;
+  if (item.useKm) return `${item.kmInterval.toLocaleString()} KM sebelum jatuh tempo`;
+  return `${item.daysInterval} hari sebelum jatuh tempo`;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 export const ReminderSettingsTab: React.FC = () => {
   // Sample Customers for Live Simulation
   const customersSample: CustomerSample[] = [
@@ -88,214 +145,276 @@ export const ReminderSettingsTab: React.FC = () => {
     },
   ];
 
-  // Automations List State
-  const [automations, setAutomations] = useState<AutomationItem[]>([
-    {
-      id: "aut-1",
-      name: "Pengingat Ganti Oli",
-      category: "Servis",
-      triggerText: "7 hari sebelum jatuh tempo",
-      daysInterval: 30,
-      kmInterval: 3000,
-      useDays: true,
-      useKm: true,
-      isActive: true,
-      targetCustomers: ["semua", "motor", "mobil"],
-      sendTime: "09:00",
-      timezone: "Asia/Jakarta",
-      sendDays: "Senin - Sabtu",
-      skipHolidays: true,
-      retryOnFailure: true,
-      messageTemplate:
-        "Halo {{customer_name}} 👋\n\nKendaraan Anda {{vehicle_name}} ({{vehicle_plate}}) akan memasuki jadwal ganti oli berkala dalam 7 hari lagi.\n\n📅 Estimasi tanggal: {{next_service_date}}\n\nSegera lakukan penggantian oli untuk menjaga performa kendaraan Anda tetap optimal.\n\nKlik tombol di bawah untuk booking servis:",
-    },
-    {
-      id: "aut-2",
-      name: "Tune Up Berkala",
-      category: "Perawatan",
-      triggerText: "90 hari / 10.000 KM",
-      daysInterval: 90,
-      kmInterval: 10000,
-      useDays: true,
-      useKm: true,
-      isActive: true,
-      targetCustomers: ["semua", "mobil"],
-      sendTime: "09:30",
-      timezone: "Asia/Jakarta",
-      sendDays: "Senin - Sabtu",
-      skipHolidays: true,
-      retryOnFailure: true,
-      messageTemplate:
-        "Halo {{customer_name}} 👋\n\nWaktunya perawatan Tune Up berkala untuk {{vehicle_name}} ({{vehicle_plate}}). Jaga efisiensi bahan bakar dan performa mesin bengkel Anda.\n\nEstimasi tanggal: {{next_service_date}}",
-    },
-    {
-      id: "aut-3",
-      name: "Rotasi Ban & Balancing",
-      category: "Ban",
-      triggerText: "30 hari",
-      daysInterval: 30,
-      kmInterval: 5000,
-      useDays: true,
-      useKm: false,
-      isActive: false,
-      targetCustomers: ["mobil"],
-      sendTime: "10:00",
-      timezone: "Asia/Jakarta",
-      sendDays: "Senin - Jumat",
-      skipHolidays: true,
-      retryOnFailure: false,
-      messageTemplate:
-        "Halo {{customer_name}}, keselamatan berkendara dimulai dari kondisi ban! Cek rotasi ban kendaraan {{vehicle_plate}} Anda hari ini.",
-    },
-    {
-      id: "aut-4",
-      name: "Cek Aki & Kelistrikan",
-      category: "Kelistrikan",
-      triggerText: "60 hari",
-      daysInterval: 60,
-      kmInterval: 8000,
-      useDays: true,
-      useKm: false,
-      isActive: false,
-      targetCustomers: ["semua"],
-      sendTime: "08:30",
-      timezone: "Asia/Jakarta",
-      sendDays: "Setiap Hari",
-      skipHolidays: false,
-      retryOnFailure: true,
-      messageTemplate:
-        "Halo {{customer_name}}, cegah mobil mogok tiba-tiba! Lakukan pengecekan tegangan aki {{vehicle_name}} Anda di POS Bengkel Baik.",
-    },
-    {
-      id: "aut-5",
-      name: "Pemeriksaan Rem & Suspensi",
-      category: "Rem",
-      triggerText: "120 hari",
-      daysInterval: 120,
-      kmInterval: 15000,
-      useDays: true,
-      useKm: true,
-      isActive: false,
-      targetCustomers: ["semua", "vip"],
-      sendTime: "09:00",
-      timezone: "Asia/Jakarta",
-      sendDays: "Senin - Sabtu",
-      skipHolidays: true,
-      retryOnFailure: true,
-      messageTemplate:
-        "Halo {{customer_name}}, sistem pengereman adalah prioritas utama keselamatan. Jadwalkan pemeriksaan kanvas rem {{vehicle_plate}} sekarang.",
-    },
-  ]);
+  // ── Data state ──────────────────────────────────────────────────────────────
+  const [automations, setAutomations] = useState<AutomationItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Selected Automation, Search, Save Notice & Menu State
-  const [selectedId, setSelectedId] = useState<string>("aut-1");
+  // ── UI state ────────────────────────────────────────────────────────────────
+  const [selectedLocalId, setSelectedLocalId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [errorNotice, setErrorNotice] = useState<string | null>(null);
 
   // Live Simulation State
   const [simCustomer, setSimCustomer] = useState<CustomerSample>(customersSample[0]);
   const [simKm, setSimKm] = useState<number>(2985);
   const [simDate, setSimDate] = useState<string>("2026-07-12");
 
-  // Active Automation Item
-  const activeAutomation =
-    automations.find((a) => a.id === selectedId) || automations[0];
+  // ── Fetch on mount ──────────────────────────────────────────────────────────
+  const fetchRules = useCallback(async () => {
+    setIsLoading(true);
+    setFetchError(null);
+    try {
+      const rules = await ReminderRuleService.getReminderRules();
+      const items = rules.map(fromApiRule);
+      setAutomations(items);
+      if (items.length > 0 && !selectedLocalId) {
+        setSelectedLocalId(items[0].localId);
+      }
+    } catch (err: any) {
+      setFetchError(err?.message || "Gagal memuat data automation.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Helper for dynamic trigger summary text
-  const getTriggerText = (item: AutomationItem) => {
-    if (item.useDays && item.useKm) {
-      return `${item.daysInterval} hari / ${item.kmInterval.toLocaleString()} KM`;
-    }
-    if (item.useDays) {
-      return `${item.daysInterval} hari sebelum jatuh tempo`;
-    }
-    if (item.useKm) {
-      return `${item.kmInterval.toLocaleString()} KM sebelum jatuh tempo`;
-    }
-    return `${item.daysInterval} hari sebelum jatuh tempo`;
+  useEffect(() => {
+    fetchRules();
+  }, [fetchRules]);
+
+  // ── Derived ─────────────────────────────────────────────────────────────────
+  const activeAutomation = automations.find((a) => a.localId === selectedLocalId) ?? null;
+
+  const filteredAutomations = automations.filter((a) => {
+    const matchesSearch = a.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCat =
+      filterCategory === "all" || a.category.toLowerCase() === filterCategory.toLowerCase();
+    return matchesSearch && matchesCat;
+  });
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  const showSuccess = (msg: string) => {
+    setSaveNotice(msg);
+    setTimeout(() => setSaveNotice(null), 3000);
   };
 
-  // Handler for toggle automation active
-  const toggleAutomationActive = (id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    setAutomations((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, isActive: !item.isActive } : item
-      )
-    );
+  const showError = (msg: string) => {
+    setErrorNotice(msg);
+    setTimeout(() => setErrorNotice(null), 4000);
   };
 
-  // Handler for deleting active automation
-  const handleDeleteAutomation = (id: string) => {
-    const updatedList = automations.filter((item) => item.id !== id);
-    setAutomations(updatedList);
-    setShowMenu(false);
-    if (updatedList.length > 0) {
-      setSelectedId(updatedList[0].id);
-    }
-  };
+  // ── Handlers ─────────────────────────────────────────────────────────────────
 
-  // Handler for editing active automation field
+  // Update a field in the local state (optimistic)
   const updateActiveField = (field: keyof AutomationItem, value: any) => {
     setAutomations((prev) =>
       prev.map((item) => {
-        if (item.id === selectedId) {
-          const updatedItem = { ...item, [field]: value };
-          // Update dynamic triggerText as well
-          updatedItem.triggerText = getTriggerText(updatedItem);
-          return updatedItem;
+        if (item.localId === selectedLocalId) {
+          const updated = { ...item, [field]: value };
+          // Keep triggerType in sync with useDays/useKm flags
+          if (field === "useDays" || field === "useKm") {
+            updated.triggerType = triggerTypeFromFlags(
+              field === "useDays" ? value : updated.useDays,
+              field === "useKm" ? value : updated.useKm
+            );
+          }
+          updated.triggerText = getTriggerTextFromItem(updated);
+          return updated;
         }
         return item;
       })
     );
   };
 
-  // Handler for explicitly saving automation
-  const handleSaveAutomation = () => {
-    if (!activeAutomation) return;
-    setSaveNotice(`✓ Automation "${activeAutomation.name}" berhasil disimpan ke Automation Library!`);
-    setTimeout(() => {
-      setSaveNotice(null);
-    }, 3000);
+  // Toggle active — optimistic then call API
+  const toggleAutomationActive = async (localId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const item = automations.find((a) => a.localId === localId);
+    if (!item) return;
+
+    // Optimistic update
+    setAutomations((prev) =>
+      prev.map((a) =>
+        a.localId === localId ? { ...a, isActive: !a.isActive } : a
+      )
+    );
+
+    if (item.id !== null) {
+      try {
+        await ReminderRuleService.toggleActive(item.id, !item.isActive);
+      } catch {
+        // Revert on failure
+        setAutomations((prev) =>
+          prev.map((a) =>
+            a.localId === localId ? { ...a, isActive: item.isActive } : a
+          )
+        );
+        showError("Gagal mengubah status automation.");
+      }
+    }
   };
 
-  // Target Customer Toggle
-  const toggleTargetCustomer = (tag: string) => {
-    const current = activeAutomation.targetCustomers;
-    const updated = current.includes(tag)
-      ? current.filter((t) => t !== tag)
-      : [...current, tag];
-    updateActiveField("targetCustomers", updated);
+  // Save (PATCH) the active automation
+  const handleSaveAutomation = async () => {
+    if (!activeAutomation) return;
+    setIsSaving(true);
+    try {
+      const payload = {
+        name: activeAutomation.name,
+        category: activeAutomation.category,
+        triggerType: triggerTypeFromFlags(activeAutomation.useDays, activeAutomation.useKm),
+        daysInterval: activeAutomation.useDays ? activeAutomation.daysInterval : null,
+        kmInterval: activeAutomation.useKm ? activeAutomation.kmInterval : null,
+        messageTemplate: activeAutomation.messageTemplate,
+        sendTime: activeAutomation.sendTime,
+        timezone: activeAutomation.timezone,
+        sendDays: activeAutomation.sendDays,
+        skipHolidays: activeAutomation.skipHolidays,
+        retryOnFailure: activeAutomation.retryOnFailure,
+        isActive: activeAutomation.isActive,
+      };
+
+      if (activeAutomation.id !== null) {
+        // Update existing
+        const updated = await ReminderRuleService.updateReminderRule(activeAutomation.id, payload);
+        setAutomations((prev) =>
+          prev.map((a) =>
+            a.localId === selectedLocalId ? fromApiRule(updated) : a
+          )
+        );
+        showSuccess(`✓ Automation "${updated.name}" berhasil disimpan.`);
+      } else {
+        // Create new (this path shouldn't be reached normally since we POST on add)
+        const created = await ReminderRuleService.createReminderRule({
+          ...payload,
+          description: null,
+        });
+        const newItem = fromApiRule(created);
+        setAutomations((prev) =>
+          prev.map((a) => (a.localId === selectedLocalId ? newItem : a))
+        );
+        setSelectedLocalId(newItem.localId);
+        showSuccess(`✓ Automation "${created.name}" berhasil disimpan.`);
+      }
+    } catch (err: any) {
+      showError(err?.message || "Gagal menyimpan automation.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Add new automation — POST immediately with defaults
+  const handleAddAutomation = async () => {
+    const tempLocalId = `temp-${Date.now()}`;
+    const defaultPayload = {
+      name: "Automation Baru",
+      description: null,
+      category: "SERVIS" as ReminderCategory,
+      triggerType: "DAYS" as ReminderTriggerType,
+      daysInterval: 14,
+      kmInterval: null,
+      messageTemplate: "Halo {{customer_name}}, ini adalah pesan reminder otomatis.",
+      sendTime: "09:00",
+      timezone: "Asia/Jakarta",
+      sendDays: "Senin - Sabtu",
+      skipHolidays: true,
+      retryOnFailure: true,
+      isActive: true,
+    };
+
+    // Optimistic: add a placeholder item
+    const placeholder: AutomationItem = {
+      id: null,
+      name: defaultPayload.name,
+      category: defaultPayload.category,
+      triggerType: defaultPayload.triggerType,
+      daysInterval: defaultPayload.daysInterval,
+      kmInterval: 2500,
+      useDays: true,
+      useKm: false,
+      isActive: true,
+      sendTime: defaultPayload.sendTime,
+      timezone: defaultPayload.timezone,
+      sendDays: defaultPayload.sendDays,
+      skipHolidays: true,
+      retryOnFailure: true,
+      messageTemplate: defaultPayload.messageTemplate,
+      localId: tempLocalId,
+      triggerText: "14 hari sebelum jatuh tempo",
+    };
+
+    setAutomations((prev) => [placeholder, ...prev]);
+    setSelectedLocalId(tempLocalId);
+    setFilterCategory("all");
+    setSearchQuery("");
+
+    try {
+      const created = await ReminderRuleService.createReminderRule(defaultPayload);
+      const newItem = fromApiRule(created);
+      // Replace placeholder with real item
+      setAutomations((prev) =>
+        prev.map((a) => (a.localId === tempLocalId ? newItem : a))
+      );
+      setSelectedLocalId(newItem.localId);
+      showSuccess(`✓ Automation Baru berhasil ditambahkan ke Library.`);
+    } catch (err: any) {
+      // Remove placeholder on failure
+      setAutomations((prev) => prev.filter((a) => a.localId !== tempLocalId));
+      setSelectedLocalId(automations[0]?.localId ?? null);
+      showError(err?.message || "Gagal membuat automation baru.");
+    }
+  };
+
+  // Delete active automation
+  const handleDeleteAutomation = async (localId: string) => {
+    const item = automations.find((a) => a.localId === localId);
+    if (!item) return;
+
+    // Optimistic remove
+    const updatedList = automations.filter((a) => a.localId !== localId);
+    setAutomations(updatedList);
+    setShowMenu(false);
+    if (updatedList.length > 0) {
+      setSelectedLocalId(updatedList[0].localId);
+    } else {
+      setSelectedLocalId(null);
+    }
+
+    if (item.id !== null) {
+      try {
+        await ReminderRuleService.deleteReminderRule(item.id);
+        showSuccess(`Automation "${item.name}" berhasil dihapus.`);
+      } catch (err: any) {
+        // Revert
+        setAutomations((prev) => [...prev, item]);
+        setSelectedLocalId(localId);
+        showError(err?.message || "Gagal menghapus automation.");
+      }
+    }
   };
 
   // Insert Variable to Template
   const insertVariable = (variableTag: string) => {
+    if (!activeAutomation) return;
     updateActiveField(
       "messageTemplate",
       activeAutomation.messageTemplate + " " + variableTag
     );
   };
 
-  // Filtered automations
-  const filteredAutomations = automations.filter((a) => {
-    const matchesSearch = a.name
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesCat =
-      filterCategory === "all" || a.category.toLowerCase() === filterCategory.toLowerCase();
-    return matchesSearch && matchesCat;
-  });
-
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 animate-fadeIn font-sans">
       {/* MAIN 3-COLUMN ENTERPRISE AUTOMATION BUILDER LAYOUT */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* ========================================================================= */}
-        {/* KOLOM KIRI (30%) - AUTOMATION LIBRARY (Linear Style Compact List) */}
-        {/* ========================================================================= */}
+        {/* ================================================================= */}
+        {/* KOLOM KIRI (30%) - AUTOMATION LIBRARY */}
+        {/* ================================================================= */}
         <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-4">
           <div className="flex items-center justify-between gap-2">
             <div>
@@ -308,33 +427,7 @@ export const ReminderSettingsTab: React.FC = () => {
             </div>
             <button
               type="button"
-              onClick={() => {
-                const newId = `aut-${Date.now()}`;
-                const newItem: AutomationItem = {
-                  id: newId,
-                  name: "Automation Baru",
-                  category: "Servis",
-                  triggerText: "14 hari sebelum servis",
-                  daysInterval: 14,
-                  kmInterval: 2500,
-                  useDays: true,
-                  useKm: false,
-                  isActive: true,
-                  targetCustomers: ["semua"],
-                  sendTime: "09:00",
-                  timezone: "Asia/Jakarta",
-                  sendDays: "Senin - Sabtu",
-                  skipHolidays: true,
-                  retryOnFailure: true,
-                  messageTemplate: "Halo {{customer_name}}, ini adalah pesan reminder otomatis.",
-                };
-                setAutomations((prev) => [newItem, ...prev]);
-                setSelectedId(newId);
-                setFilterCategory("all");
-                setSearchQuery("");
-                setSaveNotice(`✓ Automation Baru berhasil ditambahkan ke Library!`);
-                setTimeout(() => setSaveNotice(null), 3000);
-              }}
+              onClick={handleAddAutomation}
               className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#25D366] hover:bg-emerald-600 text-white shadow-xs transition-all flex items-center gap-1 shrink-0 cursor-pointer active:scale-95"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -356,7 +449,7 @@ export const ReminderSettingsTab: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-1 overflow-x-auto pb-1 custom-scrollbar">
-              {["all", "Servis", "Perawatan", "Ban", "Rem"].map((cat) => (
+              {["all", "SERVIS", "PERAWATAN", "BAN", "REM"].map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setFilterCategory(cat)}
@@ -366,87 +459,109 @@ export const ReminderSettingsTab: React.FC = () => {
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
-                  {cat === "all" ? "Semua" : cat}
+                  {cat === "all" ? "Semua" : cat.charAt(0) + cat.slice(1).toLowerCase()}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Loading State */}
+          {isLoading && (
+            <div className="py-8 flex flex-col items-center justify-center gap-2 text-slate-400">
+              <Loader2 className="w-5 h-5 animate-spin text-[#25D366]" />
+              <span className="text-xs">Memuat automation...</span>
+            </div>
+          )}
+
+          {/* Error State */}
+          {!isLoading && fetchError && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{fetchError}</span>
+            </div>
+          )}
+
           {/* Automation List Items */}
-          <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1 custom-scrollbar">
-            {filteredAutomations.map((item) => {
-              const isSelected = item.id === selectedId;
+          {!isLoading && !fetchError && (
+            <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1 custom-scrollbar">
+              {filteredAutomations.map((item) => {
+                const isSelected = item.localId === selectedLocalId;
 
-              return (
-                <div
-                  key={item.id}
-                  onClick={() => setSelectedId(item.id)}
-                  className={`group relative p-3 rounded-xl border transition-all duration-200 cursor-pointer select-none ${
-                    isSelected
-                      ? "bg-emerald-50/50 border-[#25D366] shadow-xs ring-1 ring-[#25D366]/30"
-                      : "bg-white border-slate-200/70 hover:border-slate-300 hover:bg-slate-50/60"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-xs text-slate-900 group-hover:text-[#128C7E] truncate font-sans">
-                          {item.name}
-                        </span>
-                        {item.isActive ? (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
-                            Active
+                return (
+                  <div
+                    key={item.localId}
+                    onClick={() => setSelectedLocalId(item.localId)}
+                    className={`group relative p-3 rounded-xl border transition-all duration-200 cursor-pointer select-none ${
+                      isSelected
+                        ? "bg-emerald-50/50 border-[#25D366] shadow-xs ring-1 ring-[#25D366]/30"
+                        : "bg-white border-slate-200/70 hover:border-slate-300 hover:bg-slate-50/60"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-xs text-slate-900 group-hover:text-[#128C7E] truncate font-sans">
+                            {item.name}
                           </span>
-                        ) : (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
-                            Inactive
+                          {item.id === null && (
+                            <Loader2 className="w-3 h-3 animate-spin text-slate-400 shrink-0" />
+                          )}
+                          {item.isActive ? (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                              Active
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-[11px] text-slate-500 font-normal truncate">
+                          {item.triggerText}
+                        </p>
+
+                        <div className="flex items-center gap-2 pt-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">
+                            {item.category.charAt(0) + item.category.slice(1).toLowerCase()}
                           </span>
-                        )}
+                        </div>
                       </div>
 
-                      <p className="text-[11px] text-slate-500 font-normal truncate">
-                        {getTriggerText(item)}
-                      </p>
-
-                      <div className="flex items-center gap-2 pt-1">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">
-                          {item.category}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Toggle Switch */}
-                    <div className="pt-0.5">
-                      <button
-                        type="button"
-                        onClick={(e) => toggleAutomationActive(item.id, e)}
-                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                          item.isActive ? "bg-[#25D366]" : "bg-slate-300"
-                        }`}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
-                            item.isActive ? "translate-x-4" : "translate-x-0"
+                      {/* Toggle Switch */}
+                      <div className="pt-0.5">
+                        <button
+                          type="button"
+                          onClick={(e) => toggleAutomationActive(item.localId, e)}
+                          disabled={item.id === null}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
+                            item.isActive ? "bg-[#25D366]" : "bg-slate-300"
                           }`}
-                        />
-                      </button>
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                              item.isActive ? "translate-x-4" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
 
-            {filteredAutomations.length === 0 && (
-              <div className="p-6 text-center text-xs text-slate-400">
-                Tidak ada automation yang ditemukan.
-              </div>
-            )}
-          </div>
+              {filteredAutomations.length === 0 && (
+                <div className="p-6 text-center text-xs text-slate-400">
+                  Tidak ada automation yang ditemukan.
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* ========================================================================= */}
+        {/* ================================================================= */}
         {/* KOLOM TENGAH (45%) - AUTOMATION BUILDER EDITOR */}
-        {/* ========================================================================= */}
+        {/* ================================================================= */}
         {activeAutomation ? (
           <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-6">
             {/* Header Editor */}
@@ -476,10 +591,15 @@ export const ReminderSettingsTab: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleSaveAutomation}
-                  className="px-3.5 py-1.5 rounded-xl bg-[#25D366] hover:bg-emerald-600 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  disabled={isSaving}
+                  className="px-3.5 py-1.5 rounded-xl bg-[#25D366] hover:bg-emerald-600 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Simpan</span>
+                  {isSaving ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Save className="w-3.5 h-3.5" />
+                  )}
+                  <span>{isSaving ? "Menyimpan..." : "Simpan"}</span>
                 </button>
 
                 <div className="relative">
@@ -509,7 +629,9 @@ export const ReminderSettingsTab: React.FC = () => {
                         >
                           <Power className="w-3.5 h-3.5 text-slate-500" />
                           <span>
-                            {activeAutomation.isActive ? "Nonaktifkan Automation" : "Aktifkan Automation"}
+                            {activeAutomation.isActive
+                              ? "Nonaktifkan Automation"
+                              : "Aktifkan Automation"}
                           </span>
                         </button>
 
@@ -517,7 +639,7 @@ export const ReminderSettingsTab: React.FC = () => {
 
                         <button
                           type="button"
-                          onClick={() => handleDeleteAutomation(activeAutomation.id)}
+                          onClick={() => handleDeleteAutomation(activeAutomation.localId)}
                           className="w-full px-3.5 py-2 text-left text-rose-600 hover:bg-rose-50 font-bold flex items-center gap-2"
                         >
                           <Trash2 className="w-3.5 h-3.5 text-rose-600" />
@@ -530,11 +652,19 @@ export const ReminderSettingsTab: React.FC = () => {
               </div>
             </div>
 
-            {/* Save Toast Notice */}
+            {/* Success Toast Notice */}
             {saveNotice && (
               <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
                 <CheckCircle2 className="w-4 h-4 text-[#25D366] shrink-0" />
                 <span>{saveNotice}</span>
+              </div>
+            )}
+
+            {/* Error Toast Notice */}
+            {errorNotice && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
+                <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                <span>{errorNotice}</span>
               </div>
             )}
 
@@ -637,20 +767,20 @@ export const ReminderSettingsTab: React.FC = () => {
                 Target Customer (Penerima)
               </h4>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 {[
-                  { id: "semua", label: "Semua Pelanggan", desc: "Seluruh kendaraan aktif" },
-                  { id: "motor", label: "Hanya Motor", desc: "Pelanggan motor saja" },
-                  { id: "mobil", label: "Hanya Mobil", desc: "Pelanggan mobil saja" },
-                  { id: "vip", label: "Pelanggan VIP", desc: "Member prioritas VIP" },
-                  { id: "aktif", label: "Customer Aktif", desc: "Servis 3 bulan terakhir" },
+                  { id: "SERVIS", label: "Servis Berkala", desc: "Jadwal servis rutin" },
+                  { id: "PERAWATAN", label: "Perawatan", desc: "Perawatan kendaraan" },
+                  { id: "BAN", label: "Ban & Velg", desc: "Rotasi & balancing ban" },
+                  { id: "KELISTRIKAN", label: "Kelistrikan", desc: "Aki & sistem listrik" },
+                  { id: "REM", label: "Rem & Suspensi", desc: "Kanvas rem & per" },
                 ].map((chip) => {
-                  const isSelected = activeAutomation.targetCustomers.includes(chip.id);
+                  const isSelected = activeAutomation.category === chip.id;
                   return (
                     <button
                       key={chip.id}
                       type="button"
-                      onClick={() => toggleTargetCustomer(chip.id)}
+                      onClick={() => updateActiveField("category", chip.id as ReminderCategory)}
                       className={`p-3 rounded-xl border text-left transition-all ${
                         isSelected
                           ? "border-[#25D366] bg-emerald-50/50 text-[#128C7E] shadow-2xs font-bold"
@@ -670,7 +800,7 @@ export const ReminderSettingsTab: React.FC = () => {
               </div>
             </div>
 
-            {/* SECTION 3: CUSTOM MESSAGE TEMPLATE EDITOR & VARIABLE PICKER DIRECTLY BELOW IT */}
+            {/* SECTION 3: CUSTOM MESSAGE TEMPLATE EDITOR */}
             <div className="space-y-3 pt-2">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 font-sans">
@@ -700,7 +830,9 @@ export const ReminderSettingsTab: React.FC = () => {
                     <Sparkles className="w-3.5 h-3.5 text-[#25D366]" />
                     Sisipkan Variabel Dinamis
                   </span>
-                  <span className="text-[10px] text-slate-400 font-normal">Klik tombol untuk menyisipkan ke teks</span>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    Klik tombol untuk menyisipkan ke teks
+                  </span>
                 </div>
 
                 <div className="space-y-2">
@@ -832,9 +964,7 @@ export const ReminderSettingsTab: React.FC = () => {
                   <input
                     type="checkbox"
                     checked={activeAutomation.retryOnFailure}
-                    onChange={(e) =>
-                      updateActiveField("retryOnFailure", e.target.checked)
-                    }
+                    onChange={(e) => updateActiveField("retryOnFailure", e.target.checked)}
                     className="rounded text-[#25D366] focus:ring-[#25D366]"
                   />
                   <span>Retry Otomatis Jika Gagal</span>
@@ -913,13 +1043,20 @@ export const ReminderSettingsTab: React.FC = () => {
           </div>
         ) : (
           <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-8 text-center text-slate-400 text-xs font-sans">
-            Pilih atau buat automation baru untuk mulai mengkonfigurasi.
+            {isLoading ? (
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="w-6 h-6 animate-spin text-[#25D366]" />
+                <span>Memuat automation...</span>
+              </div>
+            ) : (
+              "Pilih atau buat automation baru untuk mulai mengkonfigurasi."
+            )}
           </div>
         )}
 
-        {/* ========================================================================= */}
+        {/* ================================================================= */}
         {/* KOLOM KANAN (45%) - REALTIME WHATSAPP PREVIEW */}
-        {/* ========================================================================= */}
+        {/* ================================================================= */}
         {activeAutomation && (
           <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-5">
             {/* Header Preview WhatsApp */}
@@ -963,7 +1100,7 @@ export const ReminderSettingsTab: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Message Bubble (WhatsApp White/Light-Green style) */}
+                {/* Message Bubble */}
                 <div className="max-w-[90%] bg-white rounded-lg p-3 text-xs shadow-xs text-slate-800 font-sans leading-relaxed space-y-2 relative ml-auto border-l-4 border-[#25D366]">
                   <p className="whitespace-pre-wrap text-[12px]">
                     {activeAutomation.messageTemplate

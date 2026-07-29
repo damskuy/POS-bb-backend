@@ -83,5 +83,7 @@ export const config = {
     "/api/invoices/:path*",
     "/api/reports/:path*",
     "/api/audit-logs/:path*",
+    "/api/dashboard/:path*",
+    "/api/reminder-rules/:path*",
   ],
 };

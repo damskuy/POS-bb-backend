@@ -308,4 +308,39 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+enum ReminderTriggerType {
+  DAYS
+  KM
+  BOTH
+}
+
+enum ReminderCategory {
+  SERVIS
+  PERAWATAN
+  BAN
+  KELISTRIKAN
+  REM
+}
+
+model ReminderRule {
+  id              Int                  @id @default(autoincrement())
+  name            String
+  description     String?
+  category        ReminderCategory     @default(SERVIS)
+  triggerType     ReminderTriggerType  @default(DAYS)
+  daysInterval    Int?
+  kmInterval      Int?
+  messageTemplate String
+  sendTime        String               @default("09:00")
+  timezone        String               @default("Asia/Jakarta")
+  sendDays        String               @default("Senin - Sabtu")
+  skipHolidays    Boolean              @default(true)
+  retryOnFailure  Boolean              @default(true)
+  isActive        Boolean              @default(true)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  deletedAt       DateTime?
+
+  @@map("reminder_rules")
+}
 

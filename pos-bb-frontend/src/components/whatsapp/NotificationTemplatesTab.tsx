@@ -227,6 +227,7 @@ export const NotificationTemplatesTab: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [showMenu, setShowMenu] = useState(false);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [isTriggerDropdownOpen, setIsTriggerDropdownOpen] = useState(false);
 
   // Sample Customer Preview Selection State
   const [selectedSample, setSelectedSample] = useState<SampleCustomerData>(
@@ -495,50 +496,40 @@ export const NotificationTemplatesTab: React.FC = () => {
                       : "bg-white border-slate-200/70 hover:border-slate-300 hover:bg-slate-50/60"
                   }`}
                 >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border mt-0.5 ${getCategoryBadgeStyle(
-                        item.category
-                      )}`}
-                    >
-                      {getCategoryIcon(item.category)}
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="font-bold text-xs text-slate-900 group-hover:text-[#128C7E] truncate font-sans">
+                        {item.title}
+                      </span>
+                      {item.status === "Published" && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                          Aktif
+                        </span>
+                      )}
+                      {item.status === "Draft" && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
+                          Draft
+                        </span>
+                      )}
+                      {item.status === "Archived" && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
+                          Archived
+                        </span>
+                      )}
                     </div>
 
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-1.5">
-                        <span className="font-bold text-xs text-slate-900 group-hover:text-[#128C7E] truncate font-sans">
-                          {item.title}
-                        </span>
-                        {item.status === "Published" && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
-                            Aktif
-                          </span>
-                        )}
-                        {item.status === "Draft" && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
-                            Draft
-                          </span>
-                        )}
-                        {item.status === "Archived" && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
-                            Archived
-                          </span>
-                        )}
-                      </div>
+                    <p className="text-[11px] text-slate-500 font-normal line-clamp-2 leading-relaxed">
+                      {item.content}
+                    </p>
 
-                      <p className="text-[11px] text-slate-500 font-normal line-clamp-1">
-                        {item.content}
-                      </p>
-
-                      <div className="flex items-center gap-2 pt-0.5">
-                        <span
-                          className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold border ${getCategoryBadgeStyle(
-                            item.category
-                          )}`}
-                        >
-                          {item.category}
-                        </span>
-                      </div>
+                    <div className="flex items-center justify-between pt-1">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold border ${getCategoryBadgeStyle(
+                          item.category
+                        )}`}
+                      >
+                        {item.category}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -668,88 +659,70 @@ export const NotificationTemplatesTab: React.FC = () => {
                 </span>
               </div>
 
-              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-emerald-100 text-[#128C7E] flex items-center justify-center shrink-0 border border-emerald-200">
-                    <Zap className="w-5 h-5 text-[#25D366]" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Trigger Utama
-                    </span>
-                    <select
-                      value={activeTemplate.triggerEvent}
-                      onChange={(e) =>
-                        updateActiveField("triggerEvent", e.target.value)
-                      }
-                      className="text-xs font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer mt-0.5"
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/40 relative">
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Trigger Utama
+                  </span>
+                  
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsTriggerDropdownOpen(!isTriggerDropdownOpen)}
+                      className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-left text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-2xs select-none cursor-pointer"
                     >
-                      <option value="Work Order Dibuat">
-                        Work Order Dibuat
-                      </option>
-                      <option value="Status Work Order → COMPLETED">
-                        Status Work Order → COMPLETED
-                      </option>
-                      <option value="Transaksi Pelunasan Invoice">
-                        Transaksi Pelunasan Invoice
-                      </option>
-                      <option value="Otomatis Scheduler Reminder (30 Hari / 3.000 KM)">
-                        Otomatis Scheduler Reminder (30 Hari / 3.000 KM)
-                      </option>
-                      <option value="3 Hari Setelah Servis Selesai">
-                        3 Hari Setelah Servis Selesai
-                      </option>
-                      <option value="Manual Campaign Dispatch">
-                        Manual Campaign Dispatch
-                      </option>
-                    </select>
+                      <span>{activeTemplate.triggerEvent}</span>
+                      <ChevronDown
+                        className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ${
+                          isTriggerDropdownOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {isTriggerDropdownOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-20"
+                          onClick={() => setIsTriggerDropdownOpen(false)}
+                        />
+                        <div className="absolute left-0 mt-2 w-full bg-white border border-slate-200/80 rounded-xl shadow-lg z-30 py-1.5 animate-fadeIn">
+                          {[
+                            "Work Order Dibuat",
+                            "Status Work Order → COMPLETED",
+                            "Transaksi Pelunasan Invoice",
+                            "Otomatis Scheduler Reminder (30 Hari / 3.000 KM)",
+                            "3 Hari Setelah Servis Selesai",
+                            "Manual Campaign Dispatch",
+                          ].map((option) => {
+                            const isSelected = activeTemplate.triggerEvent === option;
+                            return (
+                              <button
+                                key={option}
+                                type="button"
+                                onClick={() => {
+                                  updateActiveField("triggerEvent", option);
+                                  setIsTriggerDropdownOpen(false);
+                                }}
+                                className={`w-full text-left px-3.5 py-2 text-xs font-semibold hover:bg-slate-50 transition-colors flex items-center justify-between ${
+                                  isSelected ? "text-slate-900 bg-slate-50/50 font-bold" : "text-slate-600"
+                                }`}
+                              >
+                                <span>{option}</span>
+                                {isSelected && (
+                                  <span className="w-1.5 h-1.5 bg-slate-900 rounded-full" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
-
-                <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                  Otomatis
-                </span>
               </div>
             </div>
 
-            {/* SECTION 2: TARGET RECIPIENTS */}
-            <div className="space-y-3 pt-2">
-              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 font-sans">
-                <User className="w-4 h-4 text-emerald-600" />
-                Target Penerima Pesan
-              </h4>
 
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { id: "customer", label: "Customer (Pelanggan)" },
-                  { id: "teknisi", label: "Teknisi Penanggung Jawab" },
-                  { id: "owner", label: "Owner / Manager" },
-                  { id: "kasir", label: "Kasir Bengkel" },
-                ].map((chip) => {
-                  const isSelected =
-                    activeTemplate.targetRecipients.includes(chip.id);
-                  return (
-                    <button
-                      key={chip.id}
-                      type="button"
-                      onClick={() => toggleRecipient(chip.id)}
-                      className={`px-3 py-2 rounded-xl border text-xs transition-all ${
-                        isSelected
-                          ? "border-[#25D366] bg-emerald-50/50 text-[#128C7E] shadow-2xs font-bold"
-                          : "border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50 font-medium"
-                      }`}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        {chip.label}
-                        {isSelected && (
-                          <Check className="w-3.5 h-3.5 text-[#25D366]" />
-                        )}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
 
             {/* SECTION 3: KONDISI TAMBAHAN (OPSIONAL) */}
             <div className="space-y-3 pt-2">
@@ -1055,30 +1028,6 @@ export const NotificationTemplatesTab: React.FC = () => {
               </div>
             </div>
 
-            {/* PREVIEW DENGAN DATA CONTOH SELECTOR */}
-            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
-              <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                Preview Dengan Data Contoh
-              </label>
-              <div className="flex items-center gap-2">
-                <select
-                  value={selectedSample.id}
-                  onChange={(e) => {
-                    const sample = sampleCustomers.find(
-                      (s) => s.id === e.target.value
-                    );
-                    if (sample) setSelectedSample(sample);
-                  }}
-                  className="flex-1 px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-[#25D366]"
-                >
-                  {sampleCustomers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.customerName} - {s.vehiclePlate} ({s.vehicleName})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
           </div>
         )}
       </div>

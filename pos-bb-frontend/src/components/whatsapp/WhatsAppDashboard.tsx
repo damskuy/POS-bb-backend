@@ -21,8 +21,8 @@ export const WhatsAppDashboard: React.FC = () => {
       {/* 2. Horizontal Tab Navigation (Moved ABOVE Summary Cards & Overview Removed) */}
       <WhatsAppTabs activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      {/* 3. Top 4 Summary Cards (Hidden on Reminder Settings tab) */}
-      {activeTab !== "reminder-settings" && <WhatsAppSummaryCards />}
+      {/* 3. Top 4 Summary Cards (Only shown on whatsapp-settings tab) */}
+      {activeTab === "whatsapp-settings" && <WhatsAppSummaryCards />}
 
       {/* 4. Active Tab Content */}
       <div className="pt-2">
