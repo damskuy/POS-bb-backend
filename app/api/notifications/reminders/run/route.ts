@@ -12,6 +12,7 @@ import { ForbiddenError } from "@/lib/auth/errors";
  * Accepts optional body: { mode: "DRY_RUN" | "LIVE" }
  * Default mode is "DRY_RUN" for safe testing without dispatching Fonnte HTTP requests.
  * Protected for ADMIN and OWNER roles only.
+ * Supports optional REMINDER_TEST_WORK_ORDER_ID env variable.
  */
 export async function POST(request: Request) {
   try {
@@ -21,7 +22,30 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const mode = body.mode === "LIVE" ? "LIVE" : "DRY_RUN";
 
-    const result = await ReminderEngineService.runReminderEngine({ mode });
+    let testWorkOrderId: number | null = null;
+    const rawTestWoId = process.env.REMINDER_TEST_WORK_ORDER_ID;
+
+    if (rawTestWoId !== undefined && rawTestWoId !== null && rawTestWoId.trim() !== "") {
+      const parsed = Number(rawTestWoId.trim());
+      if (!Number.isInteger(parsed) || parsed <= 0) {
+        console.error(
+          `[RemindersRun] Invalid REMINDER_TEST_WORK_ORDER_ID environment variable value: "${rawTestWoId}"`
+        );
+        return error(
+          "Konfigurasi REMINDER_TEST_WORK_ORDER_ID tidak valid. Harus berupa integer positif.",
+          500
+        );
+      }
+      testWorkOrderId = parsed;
+      console.log(
+        `[RemindersRun] SAFE TEST FILTER IS ACTIVE! Strictly processing WorkOrder ID: ${testWorkOrderId}`
+      );
+    }
+
+    const result = await ReminderEngineService.runReminderEngine({
+      mode,
+      testWorkOrderId,
+    });
 
     return success(result);
   } catch (err: any) {

@@ -23,6 +23,7 @@ function safeCompare(a: string, b: string): boolean {
  * Internal Cron Job Endpoint for Railway Cron or automated schedulers.
  * Protected via Bearer token matching env CRON_SECRET.
  * Defaults to DRY_RUN mode for safety.
+ * Supports optional REMINDER_TEST_WORK_ORDER_ID env variable for safe testing.
  */
 export async function POST(request: Request) {
   const startedAt = new Date();
@@ -59,7 +60,32 @@ export async function POST(request: Request) {
     const rawMode = (process.env.REMINDER_JOB_MODE || "DRY_RUN").toUpperCase();
     const mode: "DRY_RUN" | "LIVE" = rawMode === "LIVE" ? "LIVE" : "DRY_RUN";
 
-    // 4. Concurrency Protection (Acquire DB Lock)
+    // 4. Evaluate REMINDER_TEST_WORK_ORDER_ID env variable
+    let testWorkOrderId: number | null = null;
+    const rawTestWoId = process.env.REMINDER_TEST_WORK_ORDER_ID;
+
+    if (rawTestWoId !== undefined && rawTestWoId !== null && rawTestWoId.trim() !== "") {
+      const parsed = Number(rawTestWoId.trim());
+      if (!Number.isInteger(parsed) || parsed <= 0) {
+        console.error(
+          `[InternalCron] Invalid REMINDER_TEST_WORK_ORDER_ID environment variable value: "${rawTestWoId}"`
+        );
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Konfigurasi REMINDER_TEST_WORK_ORDER_ID tidak valid. Harus berupa integer positif.",
+          },
+          { status: 500 }
+        );
+      }
+      testWorkOrderId = parsed;
+      console.log(
+        `[InternalCron] SAFE TEST FILTER IS ACTIVE! Strictly processing WorkOrder ID: ${testWorkOrderId}`
+      );
+    }
+
+    // 5. Concurrency Protection (Acquire DB Lock)
     const { acquired, jobLog } = await JobExecutionService.acquireLock(
       "service-reminders",
       mode
@@ -72,9 +98,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // 5. Execute Reminder Engine
+    // 6. Execute Reminder Engine with optional testWorkOrderId filter
     try {
-      const engineResult = await ReminderEngineService.runReminderEngine({ mode });
+      const engineResult = await ReminderEngineService.runReminderEngine({
+        mode,
+        testWorkOrderId,
+      });
       const finishedAt = new Date();
       const durationMs = finishedAt.getTime() - startedAt.getTime();
 
@@ -106,6 +135,10 @@ export async function POST(request: Request) {
             finishedAt: finishedAt.toISOString(),
             durationMs,
             summary: summaryData,
+            testFilter: engineResult.data.testFilter || {
+              enabled: testWorkOrderId !== null,
+              workOrderId: testWorkOrderId,
+            },
             diagnostics: engineResult.data.diagnostics || [],
           },
         },

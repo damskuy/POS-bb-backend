@@ -42,6 +42,11 @@ export interface DiagnosticItem {
   };
 }
 
+export interface TestFilterInfo {
+  enabled: boolean;
+  workOrderId: number | null;
+}
+
 export interface ReminderRunSummary {
   rulesChecked: number;
   workOrdersChecked: number;
@@ -51,6 +56,7 @@ export interface ReminderRunSummary {
   failedValidation: number;
   items: DryRunItem[];
   diagnostics?: DiagnosticItem[];
+  testFilter?: TestFilterInfo;
   // Live mode backward compatibility fields
   sent?: number;
   failed?: number;
@@ -59,13 +65,38 @@ export interface ReminderRunSummary {
 
 export interface RunReminderOptions {
   mode?: "DRY_RUN" | "LIVE";
+  testWorkOrderId?: number | null;
 }
 
 export class ReminderEngineService {
   /**
+   * Resolves and validates testWorkOrderId from options or process.env.REMINDER_TEST_WORK_ORDER_ID.
+   * Throws an Error if the environment variable is present but invalid.
+   */
+  public static resolveTestWorkOrderId(
+    optionId?: number | null
+  ): number | null {
+    if (typeof optionId === "number" && Number.isInteger(optionId) && optionId > 0) {
+      return optionId;
+    }
+
+    const envVal = process.env.REMINDER_TEST_WORK_ORDER_ID;
+    if (envVal !== undefined && envVal !== null && envVal.trim() !== "") {
+      const parsed = Number(envVal.trim());
+      if (!Number.isInteger(parsed) || parsed <= 0) {
+        throw new Error(
+          "Konfigurasi REMINDER_TEST_WORK_ORDER_ID tidak valid. Harus berupa integer positif."
+        );
+      }
+      return parsed;
+    }
+
+    return null;
+  }
+
+  /**
    * Main entry point for Reminder Engine supporting DRY_RUN and LIVE modes.
-   * Default mode during testing is "DRY_RUN" which simulates eligibility and rendering
-   * WITHOUT dispatching any HTTP requests to Fonnte or writing fake SENT logs.
+   * Strictly respects REMINDER_TEST_WORK_ORDER_ID filter if enabled.
    */
   static async runReminderEngine(options: RunReminderOptions = {}): Promise<{
     success: boolean;
@@ -73,16 +104,17 @@ export class ReminderEngineService {
     data: ReminderRunSummary;
   }> {
     const mode = options.mode || "DRY_RUN";
+    const testWorkOrderId = this.resolveTestWorkOrderId(options.testWorkOrderId);
 
     if (mode === "DRY_RUN") {
-      const summary = await this.executeDryRun();
+      const summary = await this.executeDryRun(testWorkOrderId);
       return {
         success: true,
         mode: "DRY_RUN",
         data: summary,
       };
     } else {
-      const summary = await this.executeLiveRun();
+      const summary = await this.executeLiveRun(testWorkOrderId);
       return {
         success: true,
         mode: "LIVE",
@@ -94,11 +126,20 @@ export class ReminderEngineService {
   /**
    * DRY_RUN Execution:
    * Simulates eligibility calculation, template rendering, and duplicate prevention checks.
-   * Provides detailed diagnostics array explaining the exact reason why each Work Order is eligible or not.
-   * ABSOLUTELY NO HTTP REQUESTS TO FONNTE ARE MADE.
-   * ABSOLUTELY NO FAKE "SENT" LOGS ARE CREATED IN NOTIFICATION HISTORY.
+   * Strictly filters Prisma WorkOrder query when testWorkOrderId is active.
    */
-  private static async executeDryRun(): Promise<ReminderRunSummary> {
+  private static async executeDryRun(
+    testWorkOrderId: number | null
+  ): Promise<ReminderRunSummary> {
+    const isTestFilterActive =
+      typeof testWorkOrderId === "number" && testWorkOrderId > 0;
+
+    if (isTestFilterActive) {
+      console.log(
+        `[ReminderEngine] SAFE TEST FILTER IS ACTIVE! Strictly querying database for WorkOrder ID: ${testWorkOrderId}`
+      );
+    }
+
     const rules = await prisma.reminderRule.findMany({
       where: {
         isActive: true,
@@ -106,11 +147,16 @@ export class ReminderEngineService {
       },
     });
 
-    // Fetch all active WorkOrders to provide diagnostic status for each
+    // Build Work Order query condition - FILTER APPLIED DIRECTLY AT PRISMA DB LEVEL
+    const woWhereCondition: any = {
+      deletedAt: null,
+    };
+    if (isTestFilterActive) {
+      woWhereCondition.id = testWorkOrderId;
+    }
+
     const workOrders = await prisma.workOrder.findMany({
-      where: {
-        deletedAt: null,
-      },
+      where: woWhereCondition,
       include: {
         customer: true,
         vehicle: true,
@@ -135,6 +181,11 @@ export class ReminderEngineService {
     const simulatedSentPhones = new Set<string>();
     const now = new Date();
 
+    const testFilter: TestFilterInfo = {
+      enabled: isTestFilterActive,
+      workOrderId: isTestFilterActive ? testWorkOrderId : null,
+    };
+
     if (rules.length === 0 || workOrders.length === 0) {
       return {
         rulesChecked,
@@ -145,6 +196,7 @@ export class ReminderEngineService {
         failedValidation: 0,
         items: [],
         diagnostics: [],
+        testFilter,
       };
     }
 
@@ -177,7 +229,7 @@ export class ReminderEngineService {
           );
           dueDateIso = dueDate.toISOString();
 
-          // Check interval eligibility (exact ms diff >= daysInterval days)
+          // Check interval eligibility
           if (daysDiffExact < daysInterval) {
             woReason = "DATE_NOT_DUE";
           } else {
@@ -288,15 +340,27 @@ export class ReminderEngineService {
       failedValidation,
       items,
       diagnostics,
+      testFilter,
     };
   }
 
   /**
    * LIVE Execution:
    * Real dispatch path via Fonnte Provider and real NotificationHistory logging.
-   * (NOT USED BY DEFAULT DURING DRY RUN TESTING)
+   * Strictly filters Prisma WorkOrder query when testWorkOrderId is active.
    */
-  private static async executeLiveRun(): Promise<ReminderRunSummary> {
+  private static async executeLiveRun(
+    testWorkOrderId: number | null
+  ): Promise<ReminderRunSummary> {
+    const isTestFilterActive =
+      typeof testWorkOrderId === "number" && testWorkOrderId > 0;
+
+    if (isTestFilterActive) {
+      console.log(
+        `[ReminderEngine] SAFE TEST FILTER IS ACTIVE IN LIVE MODE! Strictly querying database for WorkOrder ID: ${testWorkOrderId}`
+      );
+    }
+
     const rules = await prisma.reminderRule.findMany({
       where: {
         isActive: true,
@@ -304,12 +368,17 @@ export class ReminderEngineService {
       },
     });
 
+    const woWhereCondition: any = {
+      status: WorkOrderStatus.COMPLETED,
+      finishedAt: { not: null },
+      deletedAt: null,
+    };
+    if (isTestFilterActive) {
+      woWhereCondition.id = testWorkOrderId;
+    }
+
     const workOrders = await prisma.workOrder.findMany({
-      where: {
-        status: WorkOrderStatus.COMPLETED,
-        finishedAt: { not: null },
-        deletedAt: null,
-      },
+      where: woWhereCondition,
       include: {
         customer: true,
         vehicle: true,
@@ -333,6 +402,11 @@ export class ReminderEngineService {
     const items: DryRunItem[] = [];
     const now = new Date();
 
+    const testFilter: TestFilterInfo = {
+      enabled: isTestFilterActive,
+      workOrderId: isTestFilterActive ? testWorkOrderId : null,
+    };
+
     if (rules.length === 0 || workOrders.length === 0) {
       return {
         rulesChecked,
@@ -342,6 +416,7 @@ export class ReminderEngineService {
         skipped: 0,
         failedValidation: 0,
         items: [],
+        testFilter,
       };
     }
 
@@ -463,6 +538,7 @@ export class ReminderEngineService {
       failed,
       customersEligible: eligible,
       items,
+      testFilter,
     };
   }
 
