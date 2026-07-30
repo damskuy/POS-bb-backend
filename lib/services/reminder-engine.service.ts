@@ -18,6 +18,30 @@ export interface DryRunItem {
   reason?: string;
 }
 
+export interface DiagnosticItem {
+  workOrderId: number;
+  workOrderCode: string;
+  eligible: boolean;
+  reason:
+    | "ELIGIBLE"
+    | "STATUS_NOT_MATCHED"
+    | "FINISHED_AT_MISSING"
+    | "DATE_NOT_DUE"
+    | "CUSTOMER_NOT_FOUND"
+    | "PHONE_MISSING"
+    | "PHONE_INVALID"
+    | "ALREADY_REMINDER_SENT"
+    | "RULE_NOT_ACTIVE";
+  relevantDates: {
+    finishedAt: string | null;
+    now: string;
+    daysDiffExact: number;
+    daysDiffFloor: number;
+    daysInterval: number;
+    dueDate: string | null;
+  };
+}
+
 export interface ReminderRunSummary {
   rulesChecked: number;
   workOrdersChecked: number;
@@ -26,6 +50,7 @@ export interface ReminderRunSummary {
   skipped: number;
   failedValidation: number;
   items: DryRunItem[];
+  diagnostics?: DiagnosticItem[];
   // Live mode backward compatibility fields
   sent?: number;
   failed?: number;
@@ -69,6 +94,7 @@ export class ReminderEngineService {
   /**
    * DRY_RUN Execution:
    * Simulates eligibility calculation, template rendering, and duplicate prevention checks.
+   * Provides detailed diagnostics array explaining the exact reason why each Work Order is eligible or not.
    * ABSOLUTELY NO HTTP REQUESTS TO FONNTE ARE MADE.
    * ABSOLUTELY NO FAKE "SENT" LOGS ARE CREATED IN NOTIFICATION HISTORY.
    */
@@ -80,10 +106,9 @@ export class ReminderEngineService {
       },
     });
 
+    // Fetch all active WorkOrders to provide diagnostic status for each
     const workOrders = await prisma.workOrder.findMany({
       where: {
-        status: WorkOrderStatus.COMPLETED,
-        finishedAt: { not: null },
         deletedAt: null,
       },
       include: {
@@ -95,17 +120,18 @@ export class ReminderEngineService {
           },
         },
       },
-      orderBy: { finishedAt: "desc" },
+      orderBy: { id: "desc" },
     });
 
     const rulesChecked = rules.length;
     const workOrdersChecked = workOrders.length;
-    let eligible = 0;
+    let eligibleCount = 0;
     let wouldSend = 0;
     let skipped = 0;
     let failedValidation = 0;
 
     const items: DryRunItem[] = [];
+    const diagnostics: DiagnosticItem[] = [];
     const simulatedSentPhones = new Set<string>();
     const now = new Date();
 
@@ -118,120 +144,150 @@ export class ReminderEngineService {
         skipped: 0,
         failedValidation: 0,
         items: [],
+        diagnostics: [],
       };
     }
 
-    for (const rule of rules) {
-      const daysInterval = rule.daysInterval ?? 30;
+    for (const wo of workOrders) {
+      const finishedAt = wo.finishedAt ? new Date(wo.finishedAt) : null;
+      let woIsEligible = false;
+      let woReason: DiagnosticItem["reason"] = "ELIGIBLE";
+      let daysDiffExact = 0;
+      let daysDiffFloor = 0;
+      let daysIntervalTarget = 30;
+      let dueDateIso: string | null = null;
 
-      for (const wo of workOrders) {
-        if (!wo.finishedAt) continue;
+      // 1. Check Work Order status
+      if (wo.status !== WorkOrderStatus.COMPLETED) {
+        woReason = "STATUS_NOT_MATCHED";
+      } else if (!finishedAt) {
+        woReason = "FINISHED_AT_MISSING";
+      } else {
+        // Evaluate against active reminder rules
+        for (const rule of rules) {
+          const daysInterval = rule.daysInterval ?? 30;
+          daysIntervalTarget = daysInterval;
 
-        const finishedAt = new Date(wo.finishedAt);
-        const daysDiff = Math.floor(
-          (now.getTime() - finishedAt.getTime()) / (1000 * 60 * 60 * 24)
-        );
-
-        // Check if Work Order is eligible based on daysInterval
-        if (daysDiff >= daysInterval) {
-          eligible++;
+          const diffMs = now.getTime() - finishedAt.getTime();
+          daysDiffExact = Number((diffMs / (1000 * 60 * 60 * 24)).toFixed(3));
+          daysDiffFloor = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
           const dueDate = new Date(
             finishedAt.getTime() + daysInterval * 24 * 60 * 60 * 1000
           );
+          dueDateIso = dueDate.toISOString();
 
-          // Validation Check: Customer & Phone presence
-          if (!wo.customer || !wo.customer.phone || !wo.customer.name) {
-            failedValidation++;
-            continue;
-          }
+          // Check interval eligibility (exact ms diff >= daysInterval days)
+          if (daysDiffExact < daysInterval) {
+            woReason = "DATE_NOT_DUE";
+          } else {
+            // Check customer presence
+            if (!wo.customer) {
+              woReason = "CUSTOMER_NOT_FOUND";
+              failedValidation++;
+            } else if (!wo.customer.phone || !wo.customer.phone.trim()) {
+              woReason = "PHONE_MISSING";
+              failedValidation++;
+            } else {
+              let cleanPhone = wo.customer.phone.replace(/[^0-9+]/g, "").trim();
+              if (cleanPhone.startsWith("+")) cleanPhone = cleanPhone.substring(1);
+              if (cleanPhone.startsWith("0")) cleanPhone = "62" + cleanPhone.substring(1);
 
-          // Phone normalization and validation
-          let cleanPhone = wo.customer.phone.replace(/[^0-9+]/g, "").trim();
-          if (cleanPhone.startsWith("+")) cleanPhone = cleanPhone.substring(1);
-          if (cleanPhone.startsWith("0")) cleanPhone = "62" + cleanPhone.substring(1);
+              if (!cleanPhone.startsWith("62") || cleanPhone.length < 10) {
+                woReason = "PHONE_INVALID";
+                failedValidation++;
+              } else {
+                // Check duplicate send in NotificationHistory
+                const existingSend = await prisma.notificationHistory.findFirst({
+                  where: {
+                    recipientPhone: cleanPhone,
+                    category: NotificationCategory.SERVICE_REMINDER,
+                    status: {
+                      in: [NotificationStatus.SENT, NotificationStatus.DELIVERED],
+                    },
+                    createdAt: { gte: finishedAt },
+                  },
+                });
 
-          if (!cleanPhone.startsWith("62") || cleanPhone.length < 10) {
-            failedValidation++;
-            continue;
-          }
+                const sessionKey = `${cleanPhone}_${wo.id}`;
+                if (existingSend || simulatedSentPhones.has(sessionKey)) {
+                  woReason = "ALREADY_REMINDER_SENT";
+                  skipped++;
+                } else {
+                  // ALL ELIGIBILITY CHECKS PASSED
+                  woIsEligible = true;
+                  woReason = "ELIGIBLE";
+                  eligibleCount++;
+                  wouldSend++;
+                  simulatedSentPhones.add(sessionKey);
 
-          // Duplicate Prevention Check in Real NotificationHistory
-          const existingSend = await prisma.notificationHistory.findFirst({
-            where: {
-              recipientPhone: cleanPhone,
-              category: NotificationCategory.SERVICE_REMINDER,
-              status: {
-                in: [NotificationStatus.SENT, NotificationStatus.DELIVERED],
-              },
-              createdAt: { gte: finishedAt },
-            },
-          });
+                  const serviceName =
+                    wo.services && wo.services.length > 0 && wo.services[0].service
+                      ? wo.services[0].service.name
+                      : "Servis Berkala";
 
-          // Check if already processed in this dry run session for the same phone & finishedAt
-          const sessionKey = `${cleanPhone}_${wo.id}`;
-          if (existingSend || simulatedSentPhones.has(sessionKey)) {
-            skipped++;
-            continue;
-          }
+                  const vehicleName = wo.vehicle
+                    ? `${wo.vehicle.brand} ${wo.vehicle.model}`.trim()
+                    : "Kendaraan Anda";
 
-          simulatedSentPhones.add(sessionKey);
+                  const renderedMessage = TemplateRendererService.render(
+                    rule.messageTemplate,
+                    {
+                      customer: wo.customer,
+                      vehicle: wo.vehicle,
+                      workOrder: wo,
+                      variables: {
+                        vehicle_name: vehicleName,
+                        vehicleName: vehicleName,
+                        service_name: serviceName,
+                        serviceName: serviceName,
+                        current_km: wo.odometer ? wo.odometer.toLocaleString() : "-",
+                        booking_link: "https://bengkelbaik.id/booking",
+                      },
+                    }
+                  );
 
-          // Render message using TemplateRendererService
-          const serviceName =
-            wo.services && wo.services.length > 0 && wo.services[0].service
-              ? wo.services[0].service.name
-              : "Servis Berkala";
-
-          const vehicleName = wo.vehicle
-            ? `${wo.vehicle.brand} ${wo.vehicle.model}`.trim()
-            : "Kendaraan Anda";
-
-          const formattedServiceDate = finishedAt.toLocaleDateString("id-ID", {
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-          });
-
-          const renderedMessage = TemplateRendererService.render(
-            rule.messageTemplate,
-            {
-              customer: wo.customer,
-              vehicle: wo.vehicle,
-              workOrder: wo,
-              variables: {
-                vehicle_name: vehicleName,
-                vehicleName: vehicleName,
-                service_name: serviceName,
-                serviceName: serviceName,
-                current_km: wo.odometer ? wo.odometer.toLocaleString() : "-",
-                booking_link: "https://bengkelbaik.id/booking",
-              },
+                  items.push({
+                    workOrderId: wo.id,
+                    customerName: wo.customer.name,
+                    recipientPhone: cleanPhone,
+                    templateName: rule.name,
+                    dueDate: dueDateIso,
+                    renderedMessage,
+                    reason: "Eligible untuk dikirim (Simulasi)",
+                  });
+                }
+              }
             }
-          );
-
-          wouldSend++;
-          items.push({
-            workOrderId: wo.id,
-            customerName: wo.customer.name,
-            recipientPhone: cleanPhone,
-            templateName: rule.name,
-            dueDate: dueDate.toISOString(),
-            renderedMessage,
-            reason: "Eligible untuk dikirim (Simulasi)",
-          });
+          }
         }
       }
+
+      diagnostics.push({
+        workOrderId: wo.id,
+        workOrderCode: wo.code,
+        eligible: woIsEligible,
+        reason: woReason,
+        relevantDates: {
+          finishedAt: finishedAt ? finishedAt.toISOString() : null,
+          now: now.toISOString(),
+          daysDiffExact,
+          daysDiffFloor,
+          daysInterval: daysIntervalTarget,
+          dueDate: dueDateIso,
+        },
+      });
     }
 
     return {
       rulesChecked,
       workOrdersChecked,
-      eligible,
+      eligible: eligibleCount,
       wouldSend,
       skipped,
       failedValidation,
       items,
+      diagnostics,
     };
   }
 
@@ -296,11 +352,10 @@ export class ReminderEngineService {
         if (!wo.finishedAt) continue;
 
         const finishedAt = new Date(wo.finishedAt);
-        const daysDiff = Math.floor(
-          (now.getTime() - finishedAt.getTime()) / (1000 * 60 * 60 * 24)
-        );
+        const diffMs = now.getTime() - finishedAt.getTime();
+        const daysDiffExact = diffMs / (1000 * 60 * 60 * 24);
 
-        if (daysDiff >= daysInterval) {
+        if (daysDiffExact >= daysInterval) {
           eligible++;
 
           if (!wo.customer || !wo.customer.phone || !wo.customer.name) {

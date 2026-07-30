@@ -106,6 +106,7 @@ export async function POST(request: Request) {
             finishedAt: finishedAt.toISOString(),
             durationMs,
             summary: summaryData,
+            diagnostics: engineResult.data.diagnostics || [],
           },
         },
         { status: 200 }
