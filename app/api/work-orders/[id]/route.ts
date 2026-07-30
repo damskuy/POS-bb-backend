@@ -465,6 +465,14 @@ export async function PATCH(
       userAgent,
     });
 
+    // Trigger automatic WORK_ORDER_COMPLETED WhatsApp notification if status changed to COMPLETED
+    if (existing.status !== "COMPLETED" && cleanedWorkOrder.status === "COMPLETED") {
+      const { AutoNotificationService } = await import("@/lib/notifications/auto-notification.service");
+      AutoNotificationService.triggerWorkOrderCompleted(existing.id).catch((err) => {
+        console.error("Error triggering completed notification:", err);
+      });
+    }
+
     return success(cleanedWorkOrder);
   } catch (err) {
     if (err instanceof ForbiddenError) {

@@ -1,552 +1,472 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Plus,
   Search,
   CheckCircle2,
-  Clock,
-  Send,
   MoreVertical,
-  ChevronDown,
-  ChevronUp,
-  User,
-  Zap,
-  CheckCheck,
   Sparkles,
-  ArrowRight,
   Trash2,
-  Power,
-  Check,
-  ShieldCheck,
   MessageSquare,
   Save,
-  FileText,
-  Layers,
-  X,
   Copy,
-  Info,
-  Award,
-  Wrench,
-  DollarSign,
+  AlertCircle,
+  RefreshCw,
+  CheckCheck,
+  Send,
+  Users,
+  Clock,
+  Radio,
   Calendar,
+  Zap,
 } from "lucide-react";
+import {
+  NotificationTemplate,
+  NotificationCategory,
+} from "@/types/notificationTemplate";
+import { NotificationTemplateService } from "@/services/notificationTemplate.service";
 
-export interface TemplateItem {
-  id: string;
-  title: string;
-  category:
-    | "Pekerjaan Masuk"
-    | "Selesai Servis"
-    | "Pembayaran"
-    | "Reminder"
-    | "Follow Up"
-    | "Promosi";
-  status: "Draft" | "Published" | "Archived";
-  triggerEvent: string;
-  targetRecipients: string[];
-  deliveryTiming: "direct" | "delay";
-  delayMinutes: number;
-  conditions: {
-    onlyFromBooking: boolean;
-    operationalHoursOnly: boolean;
-    attachPdfInvoice: boolean;
-  };
-  content: string;
-}
-
-interface SampleCustomerData {
-  id: string;
-  customerName: string;
-  customerPhone: string;
-  vehicleName: string;
-  vehiclePlate: string;
-  woNumber: string;
-  woDate: string;
-  serviceName: string;
-  mechanicName: string;
-  invoiceNumber: string;
-  totalAmount: string;
-}
+const CATEGORY_DISPLAY_MAP: Record<string, string> = {
+  WORK_ORDER_CREATED: "Pekerjaan Masuk",
+  WORK_ORDER_COMPLETED: "Selesai Servis",
+  PAYMENT_RECEIVED: "Pembayaran",
+  SERVICE_REMINDER: "Reminder",
+  WORK_ORDER_UPDATED: "Follow Up",
+  CUSTOM: "Promosi / Custom",
+  VEHICLE_READY: "Unit Ready",
+  INVOICE_CREATED: "Invoice",
+  TEST: "Pesan Uji Coba",
+  INVOICE: "Invoice",
+  PAYMENT: "Pembayaran",
+};
 
 export const NotificationTemplatesTab: React.FC = () => {
-  // Sample Customers Data for Realtime WhatsApp Preview
-  const sampleCustomers: SampleCustomerData[] = [
-    {
-      id: "s1",
-      customerName: "Budi Santoso",
-      customerPhone: "+62 812-3456-7890",
-      vehicleName: "Honda Vario 125",
-      vehiclePlate: "B 1234 ABC",
-      woNumber: "WO-250701-001",
-      woDate: "1 Juli 2026",
-      serviceName: "Servis Berkala & Ganti Oli",
-      mechanicName: "Agus Prasetyo",
-      invoiceNumber: "INV-2026-0891",
-      totalAmount: "Rp 350.000",
-    },
-    {
-      id: "s2",
-      customerName: "Siti Aminah",
-      customerPhone: "+62 813-9876-5432",
-      vehicleName: "Toyota Avanza Veloz",
-      vehiclePlate: "B 9876 XYZ",
-      woNumber: "WO-250701-004",
-      woDate: "2 Juli 2026",
-      serviceName: "Tune Up & Engine Flush",
-      mechanicName: "Bambang M.",
-      invoiceNumber: "INV-2026-0895",
-      totalAmount: "Rp 850.000",
-    },
-    {
-      id: "s3",
-      customerName: "Rudi Hermawan",
-      customerPhone: "+62 857-1122-3344",
-      vehicleName: "Yamaha NMAX 155",
-      vehiclePlate: "D 4567 LMN",
-      woNumber: "WO-250701-009",
-      woDate: "3 Juli 2026",
-      serviceName: "Ganti Kanvas Rem & CVT",
-      mechanicName: "Dedi Kurniawan",
-      invoiceNumber: "INV-2026-0899",
-      totalAmount: "Rp 420.000",
-    },
-  ];
+  // Data States
+  const [templates, setTemplates] = useState<NotificationTemplate[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Initial Templates List State
-  const [templates, setTemplates] = useState<TemplateItem[]>([
-    {
-      id: "tpl-1",
-      title: "Work Order Baru Dibuat",
-      category: "Pekerjaan Masuk",
-      status: "Published",
-      triggerEvent: "Work Order Dibuat",
-      targetRecipients: ["customer", "teknisi"],
-      deliveryTiming: "direct",
-      delayMinutes: 0,
-      conditions: {
-        onlyFromBooking: false,
-        operationalHoursOnly: true,
-        attachPdfInvoice: false,
-      },
-      content:
-        "Halo Bpk/Ibu {{customer_name}},\n\nWork Order baru dengan nomor #{{wo_number}} untuk kendaraan {{vehicle_plate}} telah dibuat pada {{wo_date}}.\n\nTeknisi kami ({{mechanic_name}}) akan segera memproses kendaraan Anda.\n\nTerima kasih,\n{{workshop_name}}",
-    },
-    {
-      id: "tpl-2",
-      title: "Pekerjaan Selesai (Unit Ready)",
-      category: "Selesai Servis",
-      status: "Published",
-      triggerEvent: "Status Work Order → COMPLETED",
-      targetRecipients: ["customer"],
-      deliveryTiming: "direct",
-      delayMinutes: 0,
-      conditions: {
-        onlyFromBooking: false,
-        operationalHoursOnly: true,
-        attachPdfInvoice: false,
-      },
-      content:
-        "Halo Bpk/Ibu {{customer_name}},\n\nPengerjaan kendaraan {{vehicle_plate}} untuk {{service_name}} telah SELESAI. Kendaraan siap untuk diambil.\n\nTotal Estimasi Biaya: {{total_amount}}\n\nTerima kasih atas kepercayaan Anda di {{workshop_name}}!",
-    },
-    {
-      id: "tpl-3",
-      title: "Kirim Invoice & Bukti Pembayaran",
-      category: "Pembayaran",
-      status: "Published",
-      triggerEvent: "Transaksi Pelunasan Invoice",
-      targetRecipients: ["customer", "owner"],
-      deliveryTiming: "direct",
-      delayMinutes: 0,
-      conditions: {
-        onlyFromBooking: false,
-        operationalHoursOnly: false,
-        attachPdfInvoice: true,
-      },
-      content:
-        "Halo Bpk/Ibu {{customer_name}},\n\nPembayaran invoice #{{invoice_number}} sebesar {{total_amount}} untuk kendaraan {{vehicle_plate}} telah berhasil kami terima. Berikut bukti pembayaran resmi dari {{workshop_name}}.",
-    },
-    {
-      id: "tpl-4",
-      title: "Reminder Servis Berkala",
-      category: "Reminder",
-      status: "Published",
-      triggerEvent: "Otomatis Scheduler Reminder (30 Hari / 3.000 KM)",
-      targetRecipients: ["customer"],
-      deliveryTiming: "delay",
-      delayMinutes: 0,
-      conditions: {
-        onlyFromBooking: false,
-        operationalHoursOnly: true,
-        attachPdfInvoice: false,
-      },
-      content:
-        "Halo Bpk/Ibu {{customer_name}},\n\nJangan lupa servis berkala kendaraan {{vehicle_name}} ({{vehicle_plate}}). Jadwal servis berikutnya: {{next_service_date}}.\n\nKlik tombol di bawah untuk booking servis:",
-    },
-    {
-      id: "tpl-5",
-      title: "Follow Up Setelah Servis",
-      category: "Follow Up",
-      status: "Archived",
-      triggerEvent: "3 Hari Setelah Servis Selesai",
-      targetRecipients: ["customer"],
-      deliveryTiming: "delay",
-      delayMinutes: 4320,
-      conditions: {
-        onlyFromBooking: false,
-        operationalHoursOnly: true,
-        attachPdfInvoice: false,
-      },
-      content:
-        "Halo Bpk/Ibu {{customer_name}},\n\nTerima kasih sudah melakukan servis di {{workshop_name}}. Bagaimana performa kendaraan {{vehicle_plate}} Anda setelah dilakukan {{service_name}}?",
-    },
-    {
-      id: "tpl-6",
-      title: "Promosi & Penawaran Paket",
-      category: "Promosi",
-      status: "Draft",
-      triggerEvent: "Manual Campaign Dispatch",
-      targetRecipients: ["customer"],
-      deliveryTiming: "direct",
-      delayMinutes: 0,
-      conditions: {
-        onlyFromBooking: false,
-        operationalHoursOnly: true,
-        attachPdfInvoice: false,
-      },
-      content:
-        "Halo {{customer_name}},\n\nDapatkan diskon spesial 20% untuk paket Tune Up & Ganti Oli di {{workshop_name}} khusus minggu ini!",
-    },
-  ]);
-
-
-  // Selected Item & Filter States
-  const [selectedId, setSelectedId] = useState<string>("tpl-1");
+  // Filter & Search States
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
+
+  // UI Action States
   const [showMenu, setShowMenu] = useState(false);
-  const [saveNotice, setSaveNotice] = useState<string | null>(null);
-  const [isTriggerDropdownOpen, setIsTriggerDropdownOpen] = useState(false);
+  const [saveNotice, setSaveNotice] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isCreatingInline, setIsCreatingInline] = useState(false);
 
-  // Sample Customer Preview Selection State
-  const [selectedSample, setSelectedSample] = useState<SampleCustomerData>(
-    sampleCustomers[0]
-  );
+  // Delete Confirmation Modal State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [templateToDelete, setTemplateToDelete] =
+    useState<NotificationTemplate | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // Modal "+ Tambah Template" State
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newCategory, setNewCategory] =
-    useState<TemplateItem["category"]>("Pekerjaan Masuk");
-  const [newTrigger, setNewTrigger] = useState("Work Order Dibuat");
+  // Fetch Templates from Backend API
+  const loadTemplates = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      const data = await NotificationTemplateService.getNotificationTemplates();
+      setTemplates(data);
 
-  // Active Template Item
-  const activeTemplate =
-    templates.find((t) => t.id === selectedId) || templates[0];
+      if (data.length > 0) {
+        setSelectedId((prev) => {
+          if (prev && data.some((t) => t.id === prev)) return prev;
+          return data[0].id;
+        });
+      } else {
+        setSelectedId(null);
+      }
+    } catch (err: any) {
+      console.error("Error loading notification templates:", err);
+      setErrorMsg(
+        err.message || "Gagal memuat daftar template notifikasi dari server."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-  // Helper for updating active template field
-  const updateActiveField = (field: keyof TemplateItem, value: any) => {
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
+
+  // Active Selected Template
+  const activeTemplate = templates.find((t) => t.id === selectedId) || null;
+
+  // Helper for updating active template state locally
+  const updateActiveField = (field: keyof NotificationTemplate, value: any) => {
+    if (!selectedId) return;
     setTemplates((prev) =>
       prev.map((t) => (t.id === selectedId ? { ...t, [field]: value } : t))
     );
   };
 
-  // Helper for nested conditions update
-  const updateConditionField = (
-    key: keyof TemplateItem["conditions"],
-    value: boolean
-  ) => {
-    setTemplates((prev) =>
-      prev.map((t) => {
-        if (t.id === selectedId) {
-          return {
-            ...t,
-            conditions: {
-              ...t.conditions,
-              [key]: value,
-            },
-          };
-        }
-        return t;
-      })
-    );
+  // Helper for updating nested conditions
+  const updateConditionField = (key: string, value: any) => {
+    if (!activeTemplate || !selectedId) return;
+    const currentConditions = activeTemplate.conditions || {};
+    updateActiveField("conditions", {
+      ...currentConditions,
+      [key]: value,
+    });
   };
 
-  // Target Recipient Toggle
-  const toggleRecipient = (recipient: string) => {
-    const current = activeTemplate.targetRecipients;
-    const updated = current.includes(recipient)
-      ? current.filter((r) => r !== recipient)
-      : [...current, recipient];
-    updateActiveField("targetRecipients", updated);
-  };
-
-  // Insert Variable to Content
+  // Insert Variable to Message Content
   const insertVariable = (variableTag: string) => {
-    updateActiveField("content", activeTemplate.content + " " + variableTag);
+    if (!activeTemplate) return;
+    updateActiveField("message", activeTemplate.message + " " + variableTag);
   };
 
-  // Create New Template via Modal
-  const handleCreateTemplate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTitle.trim()) return;
+  // Save / Update Active Template to Backend
+  const handleSaveTemplate = async () => {
+    if (!activeTemplate) return;
+    setIsSaving(true);
+    setSaveNotice(null);
 
-    const newId = `tpl-${Date.now()}`;
-    const newItem: TemplateItem = {
-      id: newId,
-      title: newTitle,
-      category: newCategory,
-      status: "Draft",
-      triggerEvent: newTrigger,
-      targetRecipients: ["customer"],
-      deliveryTiming: "direct",
-      delayMinutes: 0,
-      conditions: {
-        onlyFromBooking: false,
-        operationalHoursOnly: true,
-        attachPdfInvoice: false,
-      },
-      content: `Halo {{customer_name}},\n\nIni adalah template pesan untuk ${newTitle}.\n\nTerima kasih,\n{{workshop_name}}`,
-    };
+    try {
+      const updated =
+        await NotificationTemplateService.updateNotificationTemplate(
+          activeTemplate.id,
+          {
+            name: activeTemplate.name,
+            category: activeTemplate.category,
+            triggerEvent: activeTemplate.triggerEvent,
+            message: activeTemplate.message,
+            targetRecipients: activeTemplate.targetRecipients,
+            deliveryTiming: activeTemplate.deliveryTiming,
+            delayMinutes: activeTemplate.delayMinutes,
+            conditions: activeTemplate.conditions,
+            isActive: activeTemplate.isActive,
+          }
+        );
 
-    setTemplates((prev) => [newItem, ...prev]);
-    setSelectedId(newId);
-    setShowAddModal(false);
-    setNewTitle("");
-    setFilterCategory("all");
-    setFilterStatus("all");
-    setSearchQuery("");
-    setSaveNotice(`✓ Template "${newItem.title}" berhasil dibuat!`);
-    setTimeout(() => setSaveNotice(null), 3000);
-  };
-
-  // Delete Template
-  const handleDeleteTemplate = (id: string) => {
-    const updatedList = templates.filter((t) => t.id !== id);
-    setTemplates(updatedList);
-    setShowMenu(false);
-    if (updatedList.length > 0) {
-      setSelectedId(updatedList[0].id);
+      setTemplates((prev) =>
+        prev.map((t) => (t.id === updated.id ? updated : t))
+      );
+      setSaveNotice({
+        type: "success",
+        message: `Template "${updated.name}" berhasil disimpan!`,
+      });
+      setTimeout(() => setSaveNotice(null), 3500);
+    } catch (err: any) {
+      console.error("Failed to update template:", err);
+      setSaveNotice({
+        type: "error",
+        message: err.message || "Gagal menyimpan perubahan template.",
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // Save Template Notification
-  const handleSaveTemplate = () => {
-    setSaveNotice(
-      `✓ Template "${activeTemplate.title}" berhasil disimpan!`
-    );
-    setTimeout(() => setSaveNotice(null), 3000);
+  // CREATE TEMPLATE DIRECTLY (NO MODAL)
+  const handleCreateInline = async () => {
+    setIsCreatingInline(true);
+    setSaveNotice(null);
+
+    const defaultTitle = `Template Baru #${templates.length + 1}`;
+    const defaultContent = `Halo {{customer_name}},\n\nDapatkan penawaran promo spesial dari {{workshop_name}}!\n\nJika ada pertanyaan, silakan hubungi kami.`;
+
+    try {
+      const created =
+        await NotificationTemplateService.createNotificationTemplate({
+          name: defaultTitle,
+          category: "CUSTOM",
+          triggerEvent: "Broadcast Promosi",
+          message: defaultContent,
+          targetRecipients: ["all_customers"],
+          deliveryTiming: "direct",
+          delayMinutes: 0,
+          conditions: {
+            targetSegment: "all_customers",
+            sendTime: "09:00",
+            sendDays: "Senin - Sabtu",
+            operationalHoursOnly: true,
+            skipHolidays: true,
+          },
+          isActive: true,
+        });
+
+      setTemplates((prev) => [created, ...prev]);
+      setSelectedId(created.id);
+      setSaveNotice({
+        type: "success",
+        message: `Template baru telah dibuat! Silakan atur kategori & pesan di editor tengah.`,
+      });
+      setTimeout(() => setSaveNotice(null), 4000);
+    } catch (err: any) {
+      console.error("Failed to create template:", err);
+      setSaveNotice({
+        type: "error",
+        message: err.message || "Gagal membuat template baru.",
+      });
+    } finally {
+      setIsCreatingInline(false);
+    }
   };
 
-  // Filtered Templates
+  // Duplicate Template
+  const handleDuplicateTemplate = async () => {
+    if (!activeTemplate) return;
+    setShowMenu(false);
+    setIsSaving(true);
+    try {
+      const duplicated =
+        await NotificationTemplateService.createNotificationTemplate({
+          name: `${activeTemplate.name} (Salinan)`,
+          category: activeTemplate.category,
+          triggerEvent: activeTemplate.triggerEvent,
+          message: activeTemplate.message,
+          targetRecipients: activeTemplate.targetRecipients,
+          deliveryTiming: activeTemplate.deliveryTiming,
+          delayMinutes: activeTemplate.delayMinutes,
+          conditions: activeTemplate.conditions,
+          isActive: activeTemplate.isActive,
+        });
+
+      setTemplates((prev) => [duplicated, ...prev]);
+      setSelectedId(duplicated.id);
+      setSaveNotice({
+        type: "success",
+        message: `Template "${activeTemplate.name}" berhasil diduplikasi!`,
+      });
+      setTimeout(() => setSaveNotice(null), 3500);
+    } catch (err: any) {
+      setSaveNotice({
+        type: "error",
+        message: err.message || "Gagal menduplikasi template.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Toggle IsActive Status
+  const handleToggleActive = async (
+    t: NotificationTemplate,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+    try {
+      const updated = await NotificationTemplateService.toggleActive(
+        t.id,
+        !t.isActive
+      );
+      setTemplates((prev) =>
+        prev.map((item) => (item.id === updated.id ? updated : item))
+      );
+    } catch (err: any) {
+      console.error("Failed to toggle template active status:", err);
+    }
+  };
+
+  // Confirm & Delete Template
+  const handleConfirmDelete = async () => {
+    if (!templateToDelete) return;
+    setIsDeleting(true);
+    try {
+      await NotificationTemplateService.deleteNotificationTemplate(
+        templateToDelete.id
+      );
+
+      const remaining = templates.filter((t) => t.id !== templateToDelete.id);
+      setTemplates(remaining);
+      if (remaining.length > 0) {
+        setSelectedId(remaining[0].id);
+      } else {
+        setSelectedId(null);
+      }
+      setShowDeleteModal(false);
+      setTemplateToDelete(null);
+    } catch (err: any) {
+      console.error("Failed to delete template:", err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Filtered Templates List
   const filteredTemplates = templates.filter((t) => {
     const matchesSearch =
-      t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.content.toLowerCase().includes(searchQuery.toLowerCase());
+      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.message.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCat =
-      filterCategory === "all" ||
-      t.category.toLowerCase() === filterCategory.toLowerCase();
-    const matchesStat =
-      filterStatus === "all" ||
-      t.status.toLowerCase() === filterStatus.toLowerCase();
-    return matchesSearch && matchesCat && matchesStat;
+      filterCategory === "all" || t.category === filterCategory;
+    return matchesSearch && matchesCat;
   });
 
-  // Calculate used variables count & score
-  const allVars = [
-    "{{customer_name}}",
-    "{{customer_phone}}",
-    "{{vehicle_name}}",
-    "{{vehicle_plate}}",
-    "{{wo_number}}",
-    "{{wo_date}}",
-    "{{invoice_number}}",
-    "{{total_amount}}",
-    "{{service_name}}",
-    "{{mechanic_name}}",
-    "{{workshop_name}}",
-    "{{booking_link}}",
-  ];
-  const usedVars = allVars.filter((v) => activeTemplate.content.includes(v));
-  const qualityScore = Math.min(100, 40 + usedVars.length * 12);
-
-  // Helper for category badge styles
-  const getCategoryBadgeStyle = (category: string) => {
-    switch (category) {
-      case "Pekerjaan Masuk":
-        return "bg-emerald-50 text-[#128C7E] border-emerald-200";
-      case "Selesai Servis":
-        return "bg-blue-50 text-blue-700 border-blue-200";
-      case "Pembayaran":
-        return "bg-amber-50 text-amber-700 border-amber-200";
-      case "Reminder":
-        return "bg-purple-50 text-purple-700 border-purple-200";
-      case "Follow Up":
-        return "bg-indigo-50 text-indigo-700 border-indigo-200";
-      case "Promosi":
-        return "bg-rose-50 text-rose-700 border-rose-200";
-      default:
-        return "bg-slate-50 text-slate-700 border-slate-200";
-    }
-  };
-
-  // Helper for category icon
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case "Pekerjaan Masuk":
-        return <Wrench className="w-4 h-4 text-emerald-600" />;
-      case "Selesai Servis":
-        return <CheckCircle2 className="w-4 h-4 text-blue-600" />;
-      case "Pembayaran":
-        return <DollarSign className="w-4 h-4 text-amber-600" />;
-      case "Reminder":
-        return <Calendar className="w-4 h-4 text-purple-600" />;
-      case "Follow Up":
-        return <Clock className="w-4 h-4 text-indigo-600" />;
-      case "Promosi":
-        return <Sparkles className="w-4 h-4 text-rose-600" />;
-      default:
-        return <FileText className="w-4 h-4 text-slate-600" />;
-    }
-  };
-
   return (
-    <div className="space-y-6 animate-fadeIn font-sans">
-      {/* 3-COLUMN ENTERPRISE TEMPLATE BUILDER LAYOUT */}
+    <div className="space-y-6 animate-fadeIn font-sans text-slate-800">
+      {/* 3-COLUMN LAYOUT */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* ========================================================================= */}
-        {/* KOLOM KIRI (30%) - TEMPLATE LIBRARY (Search, Filter, Compact List) */}
-        {/* ========================================================================= */}
+        {/* ================================================================= */}
+        {/* KOLOM KIRI (30%) - TEMPLATE LIBRARY */}
+        {/* ================================================================= */}
         <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-4">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <h3 className="text-sm font-bold text-slate-900 tracking-tight font-sans">
+              <h3 className="text-sm font-bold text-slate-900 tracking-tight">
                 Template Library
               </h3>
               <p className="text-[11px] text-slate-500 font-normal">
-                {templates.length} template pesan terdaftar
+                {templates.length} template terdaftar
               </p>
             </div>
-
-            {/* Modal Trigger Button */}
             <button
               type="button"
-              onClick={() => setShowAddModal(true)}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#25D366] hover:bg-emerald-600 text-white shadow-xs transition-all flex items-center gap-1 shrink-0 cursor-pointer active:scale-95"
+              disabled={isCreatingInline}
+              onClick={handleCreateInline}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#25D366] hover:bg-emerald-600 text-white shadow-xs transition-all flex items-center gap-1 shrink-0 cursor-pointer active:scale-95 disabled:opacity-50"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Tambah</span>
+              {isCreatingInline ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Plus className="w-3.5 h-3.5" />
+              )}
+              <span>{isCreatingInline ? "..." : "Tambah"}</span>
             </button>
           </div>
 
-          {/* Search, Category & Status Filters */}
+          {/* Search & Category Chips */}
           <div className="space-y-2">
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Cari template..."
+                placeholder="Cari nama atau isi pesan..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#25D366]/30 focus:border-[#25D366] bg-slate-50/50"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-700 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-[#25D366]"
-              >
-                <option value="all">Semua Kategori</option>
-                <option value="Pekerjaan Masuk">Pekerjaan Masuk</option>
-                <option value="Selesai Servis">Selesai Servis</option>
-                <option value="Pembayaran">Pembayaran</option>
-                <option value="Reminder">Reminder</option>
-                <option value="Follow Up">Follow Up</option>
-                <option value="Promosi">Promosi</option>
-              </select>
-
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-700 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-[#25D366]"
-              >
-                <option value="all">Semua Status</option>
-                <option value="Published">Published</option>
-                <option value="Draft">Draft</option>
-                <option value="Archived">Archived</option>
-              </select>
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 custom-scrollbar">
+              {[
+                { id: "all", label: "Semua" },
+                { id: "CUSTOM", label: "Promosi" },
+                { id: "WORK_ORDER_CREATED", label: "Pekerjaan" },
+                { id: "WORK_ORDER_COMPLETED", label: "Selesai" },
+                { id: "SERVICE_REMINDER", label: "Reminder" },
+                { id: "PAYMENT_RECEIVED", label: "Pembayaran" },
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setFilterCategory(cat.id)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors shrink-0 ${
+                    filterCategory === cat.id
+                      ? "bg-slate-900 text-white font-bold"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Compact Template Items List */}
-          <div className="space-y-2 max-h-[640px] overflow-y-auto pr-1 custom-scrollbar">
-            {filteredTemplates.map((item) => {
-              const isSelected = item.id === selectedId;
+          {/* Loading State */}
+          {isLoading && (
+            <div className="py-8 flex flex-col items-center justify-center gap-2 text-slate-400">
+              <RefreshCw className="w-5 h-5 animate-spin text-[#25D366]" />
+              <span className="text-xs font-medium">Memuat template...</span>
+            </div>
+          )}
 
-              return (
-                <div
-                  key={item.id}
-                  onClick={() => setSelectedId(item.id)}
-                  className={`group relative p-3 rounded-xl border transition-all duration-200 cursor-pointer select-none ${
-                    isSelected
-                      ? "bg-emerald-50/50 border-[#25D366] shadow-xs ring-1 ring-[#25D366]/30"
-                      : "bg-white border-slate-200/70 hover:border-slate-300 hover:bg-slate-50/60"
-                  }`}
-                >
-                  <div className="space-y-1.5 min-w-0">
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span className="font-bold text-xs text-slate-900 group-hover:text-[#128C7E] truncate font-sans">
-                        {item.title}
-                      </span>
-                      {item.status === "Published" && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
-                          Aktif
-                        </span>
-                      )}
-                      {item.status === "Draft" && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
-                          Draft
-                        </span>
-                      )}
-                      {item.status === "Archived" && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
-                          Archived
-                        </span>
-                      )}
-                    </div>
+          {/* Error State */}
+          {!isLoading && errorMsg && (
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
 
-                    <p className="text-[11px] text-slate-500 font-normal line-clamp-2 leading-relaxed">
-                      {item.content}
-                    </p>
+          {/* Template Cards List */}
+          {!isLoading && !errorMsg && (
+            <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1 custom-scrollbar">
+              {filteredTemplates.map((t) => {
+                const isSelected = t.id === selectedId;
+                const catLabel =
+                  CATEGORY_DISPLAY_MAP[t.category] || t.category;
 
-                    <div className="flex items-center justify-between pt-1">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold border ${getCategoryBadgeStyle(
-                          item.category
-                        )}`}
-                      >
-                        {item.category}
-                      </span>
+                return (
+                  <div
+                    key={t.id}
+                    onClick={() => setSelectedId(t.id)}
+                    className={`group relative p-3 rounded-xl border transition-all duration-200 cursor-pointer select-none ${
+                      isSelected
+                        ? "bg-emerald-50/50 border-[#25D366] shadow-xs ring-1 ring-[#25D366]/30"
+                        : "bg-white border-slate-200/70 hover:border-slate-300 hover:bg-slate-50/60"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-xs text-slate-900 group-hover:text-[#128C7E] truncate font-sans">
+                            {t.name}
+                          </span>
+                          {t.isActive ? (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                              Active
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-[11px] text-slate-500 font-normal line-clamp-2 leading-relaxed">
+                          {t.message}
+                        </p>
+
+                        <div className="flex items-center gap-2 pt-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">
+                            {catLabel}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Active Toggle Switch */}
+                      <div className="pt-0.5">
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleActive(t, e)}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            t.isActive ? "bg-[#25D366]" : "bg-slate-300"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                              t.isActive ? "translate-x-4" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
 
-            {filteredTemplates.length === 0 && (
-              <div className="p-6 text-center text-xs text-slate-400 font-normal">
-                Tidak ada template yang sesuai filter.
-              </div>
-            )}
-          </div>
+              {filteredTemplates.length === 0 && (
+                <div className="p-6 text-center text-xs text-slate-400">
+                  Tidak ada template yang cocok.
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* ========================================================================= */}
-        {/* KOLOM TENGAH (45%) - TEMPLATE BUILDER EDITOR */}
-        {/* ========================================================================= */}
+        {/* ================================================================= */}
+        {/* KOLOM TENGAH (45%) - TEMPLATE EDITOR */}
+        {/* ================================================================= */}
         {activeTemplate ? (
           <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-6">
             {/* Header Editor */}
@@ -554,44 +474,65 @@ export const NotificationTemplatesTab: React.FC = () => {
               <div className="space-y-1 flex-1 min-w-0">
                 <input
                   type="text"
-                  value={activeTemplate.title}
-                  onChange={(e) => updateActiveField("title", e.target.value)}
+                  value={activeTemplate.name}
+                  onChange={(e) => updateActiveField("name", e.target.value)}
                   className="text-base font-bold text-slate-900 font-sans border-b border-transparent hover:border-slate-300 focus:border-[#25D366] focus:outline-none bg-transparent w-full truncate"
                 />
                 <div className="flex items-center gap-2 pt-0.5">
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                      activeTemplate.isActive
+                        ? "bg-emerald-100 text-emerald-800 border border-emerald-300/80"
+                        : "bg-slate-100 text-slate-500 border border-slate-200"
+                    }`}
+                  >
+                    {activeTemplate.isActive ? "Active" : "Inactive"}
+                  </span>
+
+                  {/* Inline Category Select */}
                   <select
-                    value={activeTemplate.status}
+                    value={activeTemplate.category}
                     onChange={(e) =>
                       updateActiveField(
-                        "status",
-                        e.target.value as TemplateItem["status"]
+                        "category",
+                        e.target.value as NotificationCategory
                       )
                     }
-                    className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#25D366]"
+                    className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-[#25D366] cursor-pointer"
                   >
-                    <option value="Published">Status: Published (Aktif)</option>
-                    <option value="Draft">Status: Draft</option>
-                    <option value="Archived">Status: Archived (Nonaktif)</option>
+                    <option value="CUSTOM">Promosi / Custom (Broadcast)</option>
+                    <option value="WORK_ORDER_CREATED">Pekerjaan Masuk</option>
+                    <option value="WORK_ORDER_COMPLETED">Selesai Servis</option>
+                    <option value="VEHICLE_READY">Unit Ready</option>
+                    <option value="SERVICE_REMINDER">Reminder Servis</option>
+                    <option value="INVOICE_CREATED">Invoice</option>
+                    <option value="PAYMENT_RECEIVED">Pembayaran</option>
+                    <option value="WORK_ORDER_UPDATED">Update Status</option>
                   </select>
                 </div>
               </div>
 
-              {/* Action Buttons: Save Button & 3-Dots Dropdown Menu */}
+              {/* Action Buttons: Save & Dropdown Menu */}
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={handleSaveTemplate}
-                  className="px-3.5 py-1.5 rounded-xl bg-[#25D366] hover:bg-emerald-600 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  disabled={isSaving}
+                  className="px-4 py-2 rounded-xl bg-[#25D366] hover:bg-emerald-600 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-60"
                 >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Simpan</span>
+                  {isSaving ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Save className="w-3.5 h-3.5" />
+                  )}
+                  <span>{isSaving ? "Menyimpan..." : "Simpan"}</span>
                 </button>
 
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setShowMenu(!showMenu)}
-                    className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors focus:outline-none"
+                    className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors"
                   >
                     <MoreVertical className="w-4 h-4" />
                   </button>
@@ -602,31 +543,23 @@ export const NotificationTemplatesTab: React.FC = () => {
                         className="fixed inset-0 z-20"
                         onClick={() => setShowMenu(false)}
                       />
-                      <div className="absolute right-0 mt-1.5 w-48 bg-white rounded-xl border border-slate-200 shadow-xl py-1 z-30 font-sans animate-fadeIn text-xs">
+                      <div className="absolute right-0 mt-1.5 w-48 bg-white rounded-xl border border-slate-200 shadow-xl py-1.5 z-30 font-sans text-xs animate-fadeIn">
                         <button
                           type="button"
-                          onClick={() => {
-                            const newId = `tpl-${Date.now()}`;
-                            const duplicated: TemplateItem = {
-                              ...activeTemplate,
-                              id: newId,
-                              title: `${activeTemplate.title} (Copy)`,
-                            };
-                            setTemplates((prev) => [duplicated, ...prev]);
-                            setSelectedId(newId);
-                            setShowMenu(false);
-                          }}
+                          onClick={handleDuplicateTemplate}
                           className="w-full px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50 font-semibold flex items-center gap-2"
                         >
                           <Copy className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Duplikat Template</span>
+                          <span>Duplikasi Template</span>
                         </button>
-
                         <div className="my-1 border-t border-slate-100" />
-
                         <button
                           type="button"
-                          onClick={() => handleDeleteTemplate(activeTemplate.id)}
+                          onClick={() => {
+                            setShowMenu(false);
+                            setTemplateToDelete(activeTemplate);
+                            setShowDeleteModal(true);
+                          }}
                           className="w-full px-3.5 py-2 text-left text-rose-600 hover:bg-rose-50 font-bold flex items-center gap-2"
                         >
                           <Trash2 className="w-3.5 h-3.5 text-rose-600" />
@@ -639,513 +572,381 @@ export const NotificationTemplatesTab: React.FC = () => {
               </div>
             </div>
 
-            {/* Save Notice Banner */}
+            {/* Save Notice */}
             {saveNotice && (
-              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
-                <CheckCircle2 className="w-4 h-4 text-[#25D366] shrink-0" />
-                <span>{saveNotice}</span>
+              <div
+                className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 animate-fadeIn ${
+                  saveNotice.type === "success"
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                    : "bg-rose-50 border-rose-200 text-rose-800"
+                }`}
+              >
+                {saveNotice.type === "success" ? (
+                  <CheckCircle2 className="w-4 h-4 text-[#25D366] shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                )}
+                <span>{saveNotice.message}</span>
               </div>
             )}
 
-            {/* SECTION 1: TRIGGER EVENT */}
+            {/* MESSAGE TEXTAREA EDITOR */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 font-sans">
-                  <Zap className="w-4 h-4 text-emerald-600" />
-                  Trigger / Kapan Dikirim
-                </h4>
-                <span className="text-[11px] text-slate-400 font-medium">
-                  Aturan pemicu otomatis
-                </span>
-              </div>
-
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/40 relative">
-                <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Trigger Utama
-                  </span>
-                  
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsTriggerDropdownOpen(!isTriggerDropdownOpen)}
-                      className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-left text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-2xs select-none cursor-pointer"
-                    >
-                      <span>{activeTemplate.triggerEvent}</span>
-                      <ChevronDown
-                        className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ${
-                          isTriggerDropdownOpen ? "rotate-180" : ""
-                        }`}
-                      />
-                    </button>
-
-                    {isTriggerDropdownOpen && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-20"
-                          onClick={() => setIsTriggerDropdownOpen(false)}
-                        />
-                        <div className="absolute left-0 mt-2 w-full bg-white border border-slate-200/80 rounded-xl shadow-lg z-30 py-1.5 animate-fadeIn">
-                          {[
-                            "Work Order Dibuat",
-                            "Status Work Order → COMPLETED",
-                            "Transaksi Pelunasan Invoice",
-                            "Otomatis Scheduler Reminder (30 Hari / 3.000 KM)",
-                            "3 Hari Setelah Servis Selesai",
-                            "Manual Campaign Dispatch",
-                          ].map((option) => {
-                            const isSelected = activeTemplate.triggerEvent === option;
-                            return (
-                              <button
-                                key={option}
-                                type="button"
-                                onClick={() => {
-                                  updateActiveField("triggerEvent", option);
-                                  setIsTriggerDropdownOpen(false);
-                                }}
-                                className={`w-full text-left px-3.5 py-2 text-xs font-semibold hover:bg-slate-50 transition-colors flex items-center justify-between ${
-                                  isSelected ? "text-slate-900 bg-slate-50/50 font-bold" : "text-slate-600"
-                                }`}
-                              >
-                                <span>{option}</span>
-                                {isSelected && (
-                                  <span className="w-1.5 h-1.5 bg-slate-900 rounded-full" />
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-
-
-            {/* SECTION 3: KONDISI TAMBAHAN (OPSIONAL) */}
-            <div className="space-y-3 pt-2">
-              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 font-sans">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                Kondisi Tambahan (Opsional)
-              </h4>
-
-              <div className="space-y-2 text-xs">
-                <label className="flex items-center gap-2 text-slate-700 cursor-pointer font-medium">
-                  <input
-                    type="checkbox"
-                    checked={activeTemplate.conditions.onlyFromBooking}
-                    onChange={(e) =>
-                      updateConditionField("onlyFromBooking", e.target.checked)
-                    }
-                    className="rounded text-[#25D366] focus:ring-[#25D366]"
-                  />
-                  <span>Hanya jika pekerjaan berasal dari booking online</span>
-                </label>
-
-                <label className="flex items-center gap-2 text-slate-700 cursor-pointer font-medium">
-                  <input
-                    type="checkbox"
-                    checked={activeTemplate.conditions.operationalHoursOnly}
-                    onChange={(e) =>
-                      updateConditionField(
-                        "operationalHoursOnly",
-                        e.target.checked
-                      )
-                    }
-                    className="rounded text-[#25D366] focus:ring-[#25D366]"
-                  />
-                  <span>Kirim hanya pada jam operasional bengkel (08:00 - 17:00)</span>
-                </label>
-
-                <label className="flex items-center gap-2 text-slate-700 cursor-pointer font-medium">
-                  <input
-                    type="checkbox"
-                    checked={activeTemplate.conditions.attachPdfInvoice}
-                    onChange={(e) =>
-                      updateConditionField("attachPdfInvoice", e.target.checked)
-                    }
-                    className="rounded text-[#25D366] focus:ring-[#25D366]"
-                  />
-                  <span>Sertakan lampiran file PDF Invoice / Bukti Servis</span>
-                </label>
-              </div>
-            </div>
-
-            {/* SECTION 4: ISI PESAN WHATSAPP TEMPLATE & VARIABLE PICKER */}
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 font-sans">
                   <MessageSquare className="w-4 h-4 text-emerald-600" />
-                  Isi Pesan WhatsApp
+                  Isi Pesan Template WhatsApp
                 </h4>
-                <span className="text-[11px] text-slate-400 font-mono">
-                  {activeTemplate.content.length} karakter • {usedVars.length} variabel
-                </span>
               </div>
 
-              {/* Textarea for message template */}
-              <div className="space-y-2">
-                <textarea
-                  rows={7}
-                  value={activeTemplate.content}
-                  onChange={(e) => updateActiveField("content", e.target.value)}
-                  placeholder="Ketik isi pesan WhatsApp di sini..."
-                  className="w-full p-3.5 rounded-xl border border-slate-300 font-mono text-xs leading-relaxed text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#25D366]/40 focus:border-[#25D366] transition-all"
-                />
-              </div>
+              <textarea
+                rows={7}
+                value={activeTemplate.message}
+                onChange={(e) => updateActiveField("message", e.target.value)}
+                placeholder="Ketik pesan template WhatsApp..."
+                className="w-full p-3.5 rounded-xl border border-slate-300 font-mono text-xs leading-relaxed text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#25D366]/40 focus:border-[#25D366] transition-all"
+              />
 
-              {/* GROUPED VARIABLE PICKER DIRECTLY BELOW TEXTAREA */}
+              {/* DYNAMIC VARIABLE BUTTONS */}
               <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-[#25D366]" />
                     Sisipkan Variabel Dinamis
                   </span>
-                  <span className="text-[10px] text-slate-400 font-normal">
-                    Klik variabel untuk menyisipkan
+                  <span className="text-[10px] text-slate-400">
+                    Klik untuk menyisipkan
                   </span>
                 </div>
 
-                <div className="space-y-2">
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-500 block mb-1">
-                      Customer:
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {["{{customer_name}}", "{{customer_phone}}"].map((v) => (
-                        <button
-                          key={v}
-                          type="button"
-                          onClick={() => insertVariable(v)}
-                          className="px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-100 text-slate-700 hover:text-emerald-900 border border-slate-200 text-xs font-mono font-semibold transition-all shadow-2xs active:scale-95 cursor-pointer"
-                        >
-                          {v}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-500 block mb-1">
-                      Vehicle & Work Order:
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[
-                        "{{vehicle_name}}",
-                        "{{vehicle_plate}}",
-                        "{{wo_number}}",
-                        "{{wo_date}}",
-                      ].map((v) => (
-                        <button
-                          key={v}
-                          type="button"
-                          onClick={() => insertVariable(v)}
-                          className="px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-100 text-slate-700 hover:text-emerald-900 border border-slate-200 text-xs font-mono font-semibold transition-all shadow-2xs active:scale-95 cursor-pointer"
-                        >
-                          {v}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-500 block mb-1">
-                      Invoice, Service & Workshop:
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[
-                        "{{invoice_number}}",
-                        "{{total_amount}}",
-                        "{{service_name}}",
-                        "{{mechanic_name}}",
-                        "{{workshop_name}}",
-                        "{{booking_link}}",
-                      ].map((v) => (
-                        <button
-                          key={v}
-                          type="button"
-                          onClick={() => insertVariable(v)}
-                          className="px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-100 text-slate-700 hover:text-emerald-900 border border-slate-200 text-xs font-mono font-semibold transition-all shadow-2xs active:scale-95 cursor-pointer"
-                        >
-                          {v}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    "{{customer_name}}",
+                    "{{customer_phone}}",
+                    "{{vehicle_plate}}",
+                    "{{vehicle_brand}}",
+                    "{{vehicle_model}}",
+                    "{{work_order_number}}",
+                    "{{service_date}}",
+                    "{{workshop_name}}",
+                  ].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => insertVariable(v)}
+                      className="px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-100 text-slate-700 hover:text-emerald-900 border border-slate-200 text-xs font-mono font-semibold transition-all shadow-2xs active:scale-95 cursor-pointer"
+                    >
+                      {v}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
 
-            {/* SECTION 5: MESSAGE QUALITY & PERSONALIZATION SCORE */}
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Award className="w-4 h-4 text-emerald-600" />
-                  Tips Personalisasi & Message Quality
-                </span>
-                <span className="text-xs font-bold text-emerald-700">
-                  {usedVars.length} dari {allVars.length} variabel digunakan
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 leading-relaxed font-normal">
-                Gunakan variabel dinamis untuk membuat pesan lebih personal dan meningkatkan engagement serta kepuasan pelanggan.
-              </p>
-              <div className="w-full bg-slate-200 rounded-full h-1.5 mt-1 overflow-hidden">
-                <div
-                  className="bg-[#25D366] h-1.5 rounded-full transition-all duration-300"
-                  style={{
-                    width: `${Math.min(
-                      100,
-                      Math.max(20, (usedVars.length / 8) * 100)
-                    )}%`,
-                  }}
-                />
-              </div>
-            </div>
+            {/* ================================================================= */}
+            {/* INLINE BROADCAST CONFIGURATION (SPECIAL FOR PROMOSI / CUSTOM) */}
+            {/* ================================================================= */}
+            {activeTemplate.category === "CUSTOM" && (
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-5 animate-fadeIn">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2 font-sans">
+                    <Users className="w-4 h-4 text-emerald-600" />
+                    Konfigurasi Broadcast Promosi & Target
+                  </h4>
+                  <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-200">
+                    Fitur Broadcast
+                  </span>
+                </div>
 
-            {/* Bottom Action Footer */}
-            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  const first = templates[0];
-                  if (first) setSelectedId(first.id);
-                }}
-                className="px-4 py-2 rounded-xl text-xs font-bold border border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                Batal
-              </button>
+                {/* 1. Target Penerima Broadcast */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Ke Mana Saja Akan Dikirim (Target Segment)
+                  </label>
 
-              <button
-                type="button"
-                onClick={handleSaveTemplate}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-[#25D366] hover:bg-emerald-600 text-white shadow-md shadow-[#25D366]/20 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
-              >
-                <Save className="w-4 h-4" />
-                <span>Simpan Template</span>
-              </button>
-            </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    {[
+                      {
+                        id: "all_customers",
+                        label: "Semua Customer Terdaftar",
+                        desc: "Kirim ke seluruh database pelanggan",
+                      },
+                      {
+                        id: "active_customers",
+                        label: "Customer Aktif (30 Hari)",
+                        desc: "Servis dalam 30 hari terakhir",
+                      },
+                      {
+                        id: "inactive_customers",
+                        label: "Customer Inaktif (> 60 Hari)",
+                        desc: "Belum servis lebih dari 60 hari",
+                      },
+                      {
+                        id: "motorcycle_owners",
+                        label: "Pemilik Sepeda Motor",
+                        desc: "Segmen pelanggan motor",
+                      },
+                      {
+                        id: "car_owners",
+                        label: "Pemilik Mobil",
+                        desc: "Segmen pelanggan mobil",
+                      },
+                    ].map((seg) => {
+                      const currentSegment =
+                        activeTemplate.conditions?.targetSegment ||
+                        activeTemplate.targetRecipients?.[0] ||
+                        "all_customers";
+                      const isSelected = currentSegment === seg.id;
+
+                      return (
+                        <button
+                          key={seg.id}
+                          type="button"
+                          onClick={() => {
+                            updateActiveField("targetRecipients", [seg.id]);
+                            updateConditionField("targetSegment", seg.id);
+                          }}
+                          className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                            isSelected
+                              ? "border-[#25D366] bg-white font-bold text-slate-900 shadow-2xs ring-1 ring-[#25D366]"
+                              : "border-slate-200 bg-white/60 text-slate-600 hover:bg-white"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">{seg.label}</span>
+                            {isSelected && (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-[#25D366] shrink-0" />
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-normal block mt-0.5">
+                            {seg.desc}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. Waktu Pengiriman (Delivery Timing) */}
+                <div className="space-y-3 pt-2 border-t border-slate-200/80">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-emerald-600" />
+                    Waktu Pengiriman Pesan (Delivery Timing)
+                  </label>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => updateActiveField("deliveryTiming", "direct")}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                        activeTemplate.deliveryTiming === "direct"
+                          ? "border-[#25D366] bg-white font-bold text-slate-900 ring-1 ring-[#25D366]"
+                          : "border-slate-200 bg-white/60 text-slate-600"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs">Kirim Langsung</span>
+                        {activeTemplate.deliveryTiming === "direct" && (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[#25D366]" />
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-normal block mt-0.5">
+                        Broadcast terkirim saat tombol di-trigger
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => updateActiveField("deliveryTiming", "scheduled")}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                        activeTemplate.deliveryTiming === "scheduled"
+                          ? "border-[#25D366] bg-white font-bold text-slate-900 ring-1 ring-[#25D366]"
+                          : "border-slate-200 bg-white/60 text-slate-600"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs">Terjadwal Otomatis</span>
+                        {activeTemplate.deliveryTiming === "scheduled" && (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[#25D366]" />
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-normal block mt-0.5">
+                        Kirim sesuai jadwal jam & hari yang ditentukan
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Options Terjadwal */}
+                  {activeTemplate.deliveryTiming === "scheduled" && (
+                    <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-3 animate-fadeIn">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                            Jam Pengiriman
+                          </label>
+                          <input
+                            type="time"
+                            value={activeTemplate.conditions?.sendTime || "09:00"}
+                            onChange={(e) =>
+                              updateConditionField("sendTime", e.target.value)
+                            }
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-800"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                            Hari Aktif Kirim
+                          </label>
+                          <select
+                            value={activeTemplate.conditions?.sendDays || "Senin - Sabtu"}
+                            onChange={(e) =>
+                              updateConditionField("sendDays", e.target.value)
+                            }
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-800"
+                          >
+                            <option value="Senin - Sabtu">Senin - Sabtu</option>
+                            <option value="Setiap Hari">Setiap Hari</option>
+                            <option value="Senin - Jumat">Senin - Jumat (Weekday)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-4 pt-1">
+                        <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={activeTemplate.conditions?.operationalHoursOnly ?? true}
+                            onChange={(e) =>
+                              updateConditionField("operationalHoursOnly", e.target.checked)
+                            }
+                            className="rounded text-[#25D366] focus:ring-[#25D366]"
+                          />
+                          <span>Batasi di Jam Operasional (08:00 - 17:00)</span>
+                        </label>
+
+                        <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={activeTemplate.conditions?.skipHolidays ?? true}
+                            onChange={(e) =>
+                              updateConditionField("skipHolidays", e.target.checked)
+                            }
+                            className="rounded text-[#25D366] focus:ring-[#25D366]"
+                          />
+                          <span>Lewati Hari Libur Nasional</span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-8 text-center text-slate-400 text-xs font-sans">
-            Pilih atau buat template baru untuk mulai mengkonfigurasi.
+            Pilih atau buat template baru untuk mengedit.
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* KOLOM KANAN (45%) - REALTIME WHATSAPP PREVIEW WITH SAMPLE DATA SELECTOR */}
-        {/* ========================================================================= */}
+        {/* ================================================================= */}
+        {/* KOLOM KANAN (45%) - REALTIME WHATSAPP PREVIEW */}
+        {/* ================================================================= */}
         {activeTemplate && (
           <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-5">
-            {/* Header Preview WhatsApp */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 font-sans">
-                  Preview WhatsApp
+                  Preview WhatsApp Chat
                 </h3>
                 <p className="text-[11px] text-slate-500">
-                  Lihat tampilan pesan yang akan diterima pelanggan.
+                  Tampilan realtime ke pelanggan.
                 </p>
               </div>
             </div>
 
-            {/* REALISTIC WHATSAPP CHAT MOCKUP */}
+            {/* WHATSAPP MOCKUP BUBBLE */}
             <div className="rounded-2xl border border-slate-300 shadow-md overflow-hidden bg-[#E5DDD5]">
-              {/* WA Header Bar */}
               <div className="bg-[#075E54] text-white px-3.5 py-2.5 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-white text-[#075E54] font-extrabold text-xs flex items-center justify-center border border-white/20">
+                  <div className="w-8 h-8 rounded-full bg-white text-[#075E54] font-extrabold text-xs flex items-center justify-center">
                     BB
                   </div>
                   <div>
-                    <h5 className="text-xs font-bold leading-tight font-sans">
+                    <h5 className="text-xs font-bold font-sans">
                       POS Bengkel Baik
                     </h5>
-                    <span className="text-[10px] text-emerald-200 font-normal">
-                      online
-                    </span>
+                    <span className="text-[10px] text-emerald-200">online</span>
                   </div>
                 </div>
-                <MoreVertical className="w-4 h-4 text-white/80 cursor-pointer" />
               </div>
 
-              {/* WA Chat Wallpaper Body */}
               <div className="p-3.5 space-y-3 min-h-[300px] bg-[radial-[#00000008]_1px,transparent_1px] [background-size:12px_12px]">
-                {/* Timestamp divider */}
-                <div className="text-center">
-                  <span className="px-2.5 py-0.5 rounded-md bg-white/80 text-[10px] font-semibold text-slate-600 shadow-2xs">
-                    HARI INI
-                  </span>
-                </div>
-
-                {/* Message Bubble (WhatsApp White/Light-Green style) */}
-                <div className="max-w-[92%] bg-white rounded-lg p-3 text-xs shadow-xs text-slate-800 font-sans leading-relaxed space-y-2 relative ml-auto border-l-4 border-[#25D366]">
-                  <p className="whitespace-pre-wrap text-[12px]">
-                    {activeTemplate.content
-                      .replace(/\{\{customer_name\}\}/g, selectedSample.customerName)
-                      .replace(/\{\{customer_phone\}\}/g, selectedSample.customerPhone)
-                      .replace(/\{\{vehicle_name\}\}/g, selectedSample.vehicleName)
-                      .replace(/\{\{vehicle_plate\}\}/g, selectedSample.vehiclePlate)
-                      .replace(/\{\{wo_number\}\}/g, selectedSample.woNumber)
-                      .replace(/\{\{wo_date\}\}/g, selectedSample.woDate)
-                      .replace(/\{\{invoice_number\}\}/g, selectedSample.invoiceNumber)
-                      .replace(/\{\{total_amount\}\}/g, selectedSample.totalAmount)
-                      .replace(/\{\{service_name\}\}/g, selectedSample.serviceName)
-                      .replace(/\{\{mechanic_name\}\}/g, selectedSample.mechanicName)
-                      .replace(/\{\{workshop_name\}\}/g, "POS Bengkel Baik")
-                      .replace(/\{\{booking_link\}\}/g, "https://bengkelbaik.id/booking")}
+                <div className="max-w-[92%] bg-white rounded-lg p-3 text-xs shadow-xs text-slate-800 font-sans leading-relaxed space-y-2 ml-auto border-l-4 border-[#25D366]">
+                  <p className="whitespace-pre-wrap text-[11px]">
+                    {activeTemplate.message
+                      .replace(/\{\{customer_name\}\}/g, "Budi Santoso")
+                      .replace(/\{\{customer_phone\}\}/g, "081234567890")
+                      .replace(/\{\{vehicle_plate\}\}/g, "B 1234 ABC")
+                      .replace(/\{\{vehicle_brand\}\}/g, "Honda")
+                      .replace(/\{\{vehicle_model\}\}/g, "Vario 125")
+                      .replace(/\{\{work_order_number\}\}/g, "WO-250701-001")
+                      .replace(/\{\{service_date\}\}/g, "1 Juli 2026")
+                      .replace(/\{\{workshop_name\}\}/g, "POS Bengkel Baik")}
                   </p>
 
-                  {/* Simulated CTA Button inside WhatsApp message */}
-                  <div className="pt-1">
-                    <div className="w-full py-2 px-3 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/40 text-[#128C7E] font-bold text-center text-xs cursor-pointer transition-colors flex items-center justify-center gap-1">
-                      <span>Proses Transaksi Servis</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </div>
-                  </div>
-
-                  {/* Timestamp & Read ticks */}
                   <div className="flex items-center justify-end gap-1 text-[10px] text-slate-400 pt-1">
                     <span>09:00</span>
                     <CheckCheck className="w-3.5 h-3.5 text-[#34B7F1]" />
                   </div>
                 </div>
               </div>
-
-              {/* WA Footer Typing Area */}
-              <div className="bg-[#F0F0F0] px-3 py-2 flex items-center gap-2 border-t border-slate-200">
-                <input
-                  type="text"
-                  disabled
-                  placeholder="Ketik pesan..."
-                  className="flex-1 px-3 py-1.5 rounded-full bg-white text-xs border border-slate-200 text-slate-400 cursor-not-allowed"
-                />
-                <div className="w-7 h-7 rounded-full bg-[#128C7E] text-white flex items-center justify-center shrink-0">
-                  <Send className="w-3.5 h-3.5" />
-                </div>
-              </div>
             </div>
-
           </div>
         )}
       </div>
 
-      {/* MODAL: TAMBAH TEMPLATE BARU */}
-      {showAddModal && (
+      {/* ========================================================================= */}
+      {/* MODAL KONFIRMASI HAPUS TEMPLATE */}
+      {/* ========================================================================= */}
+      {showDeleteModal && templateToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-fadeIn"
-            onClick={() => setShowAddModal(false)}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs animate-fadeIn"
+            onClick={() => setShowDeleteModal(false)}
           />
-
-          <div className="relative bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg p-6 space-y-5 z-10 animate-scaleUp font-sans">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-[#128C7E] flex items-center justify-center border border-emerald-200">
-                  <FileText className="w-5 h-5 text-[#25D366]" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 font-sans">
-                    Tambah Template Notifikasi Baru
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Buat aturan pemicu dan template pesan otomatis baru.
-                  </p>
-                </div>
+          <div className="relative bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-sm p-5 space-y-4 z-10 font-sans">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-2 rounded-xl bg-rose-50 border border-rose-100">
+                <Trash2 className="w-5 h-5" />
               </div>
-              <button
-                type="button"
-                onClick={() => setShowAddModal(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <h3 className="text-base font-bold text-slate-900">
+                Hapus Template Notifikasi?
+              </h3>
             </div>
 
-            <form onSubmit={handleCreateTemplate} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Nama Template
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: Estimasi Biaya Perbaikan"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#25D366]/40 focus:border-[#25D366]"
-                />
-              </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Template <strong className="text-slate-900">{templateToDelete.name}</strong> akan di-soft-delete dari database secara aman. Riwayat pengiriman terdahulu tetap tersimpan di Notification History.
+            </p>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Kategori Template
-                  </label>
-                  <select
-                    value={newCategory}
-                    onChange={(e) =>
-                      setNewCategory(e.target.value as TemplateItem["category"])
-                    }
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#25D366]/40 focus:border-[#25D366]"
-                  >
-                    <option value="Pekerjaan Masuk">Pekerjaan Masuk</option>
-                    <option value="Selesai Servis">Selesai Servis</option>
-                    <option value="Pembayaran">Pembayaran</option>
-                    <option value="Reminder">Reminder</option>
-                    <option value="Follow Up">Follow Up</option>
-                    <option value="Promosi">Promosi</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Trigger Utama
-                  </label>
-                  <select
-                    value={newTrigger}
-                    onChange={(e) => setNewTrigger(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#25D366]/40 focus:border-[#25D366]"
-                  >
-                    <option value="Work Order Dibuat">Work Order Dibuat</option>
-                    <option value="Status Work Order → COMPLETED">
-                      Status Work Order → COMPLETED
-                    </option>
-                    <option value="Transaksi Pelunasan Invoice">
-                      Transaksi Pelunasan Invoice
-                    </option>
-                    <option value="Otomatis Scheduler Reminder">
-                      Otomatis Scheduler Reminder
-                    </option>
-                    <option value="3 Hari Setelah Servis Selesai">
-                      3 Hari Setelah Servis Selesai
-                    </option>
-                    <option value="Manual Campaign Dispatch">
-                      Manual Campaign Dispatch
-                    </option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2.5 rounded-xl font-bold border border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl font-bold bg-[#25D366] hover:bg-emerald-600 text-white shadow-md shadow-[#25D366]/20 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Buat Template</span>
-                </button>
-              </div>
-            </form>
+            <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+              >
+                {isDeleting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isDeleting ? "Hapus..." : "Ya, Hapus"}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
