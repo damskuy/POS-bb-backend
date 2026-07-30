@@ -33,7 +33,7 @@ const CATEGORY_DISPLAY_MAP: Record<string, string> = {
   PAYMENT_RECEIVED: "Pembayaran",
   SERVICE_REMINDER: "Reminder",
   WORK_ORDER_UPDATED: "Follow Up",
-  CUSTOM: "Promosi / Custom",
+  CUSTOM: "Custom (Broadcast)",
   VEHICLE_READY: "Unit Ready",
   INVOICE_CREATED: "Invoice",
   TEST: "Pesan Uji Coba",
@@ -498,9 +498,9 @@ export const NotificationTemplatesTab: React.FC = () => {
                         e.target.value as NotificationCategory
                       )
                     }
-                    className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-[#25D366] cursor-pointer max-w-full truncate shrink-0"
+                    className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-[#25D366] cursor-pointer max-w-[160px] sm:max-w-[190px] truncate shrink-0"
                   >
-                    <option value="CUSTOM">Promosi / Custom (Broadcast)</option>
+                    <option value="CUSTOM">Custom (Broadcast)</option>
                     <option value="WORK_ORDER_CREATED">Pekerjaan Masuk</option>
                     <option value="WORK_ORDER_COMPLETED">Selesai Servis</option>
                     <option value="VEHICLE_READY">Unit Ready</option>
