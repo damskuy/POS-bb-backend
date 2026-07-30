@@ -304,12 +304,12 @@ export const NotificationTemplatesTab: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn font-sans text-slate-800">
-      {/* 3-COLUMN LAYOUT */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+      {/* 3-COLUMN RESPONSIVE LAYOUT */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 xl:grid-cols-12 gap-5 items-start">
         {/* ================================================================= */}
-        {/* KOLOM KIRI (30%) - TEMPLATE LIBRARY */}
+        {/* KOLOM KIRI (Library) */}
         {/* ================================================================= */}
-        <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-4">
+        <div className="lg:col-span-4 xl:col-span-3 bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-4">
           <div className="flex items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-bold text-slate-900 tracking-tight">
@@ -465,22 +465,22 @@ export const NotificationTemplatesTab: React.FC = () => {
         </div>
 
         {/* ================================================================= */}
-        {/* KOLOM TENGAH (45%) - TEMPLATE EDITOR */}
+        {/* KOLOM TENGAH (Editor) */}
         {/* ================================================================= */}
         {activeTemplate ? (
-          <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-6">
+          <div className="lg:col-span-8 xl:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs space-y-6">
             {/* Header Editor */}
-            <div className="flex items-center justify-between gap-4 pb-4 border-b border-slate-100">
-              <div className="space-y-1 flex-1 min-w-0">
+            <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div className="space-y-1.5 flex-1 min-w-0">
                 <input
                   type="text"
                   value={activeTemplate.name}
                   onChange={(e) => updateActiveField("name", e.target.value)}
                   className="text-base font-bold text-slate-900 font-sans border-b border-transparent hover:border-slate-300 focus:border-[#25D366] focus:outline-none bg-transparent w-full truncate"
                 />
-                <div className="flex items-center gap-2 pt-0.5">
+                <div className="flex flex-wrap items-center gap-2 pt-0.5">
                   <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold shrink-0 ${
                       activeTemplate.isActive
                         ? "bg-emerald-100 text-emerald-800 border border-emerald-300/80"
                         : "bg-slate-100 text-slate-500 border border-slate-200"
@@ -498,7 +498,7 @@ export const NotificationTemplatesTab: React.FC = () => {
                         e.target.value as NotificationCategory
                       )
                     }
-                    className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-[#25D366] cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-[#25D366] cursor-pointer max-w-full truncate shrink-0"
                   >
                     <option value="CUSTOM">Promosi / Custom (Broadcast)</option>
                     <option value="WORK_ORDER_CREATED">Pekerjaan Masuk</option>
@@ -518,7 +518,7 @@ export const NotificationTemplatesTab: React.FC = () => {
                   type="button"
                   onClick={handleSaveTemplate}
                   disabled={isSaving}
-                  className="px-4 py-2 rounded-xl bg-[#25D366] hover:bg-emerald-600 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-60"
+                  className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-[#25D366] hover:bg-emerald-600 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-60 shrink-0"
                 >
                   {isSaving ? (
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -844,16 +844,16 @@ export const NotificationTemplatesTab: React.FC = () => {
             )}
           </div>
         ) : (
-          <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-8 text-center text-slate-400 text-xs font-sans">
+          <div className="lg:col-span-8 xl:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-8 text-center text-slate-400 text-xs font-sans">
             Pilih atau buat template baru untuk mengedit.
           </div>
         )}
 
         {/* ================================================================= */}
-        {/* KOLOM KANAN (45%) - REALTIME WHATSAPP PREVIEW */}
+        {/* KOLOM KANAN (Preview) */}
         {/* ================================================================= */}
         {activeTemplate && (
-          <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-5">
+          <div className="lg:col-span-12 xl:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 font-sans">

@@ -460,12 +460,12 @@ export const ReminderSettingsTab: React.FC = () => {
         </div>
       )}
 
-      {/* Main 3-Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+      {/* Main 3-Column Responsive Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 xl:grid-cols-12 gap-5 items-start">
         {/* ================================================================= */}
-        {/* KOLOM KIRI (30%) - DAFTAR ATURAN REMINDER */}
+        {/* KOLOM KIRI (Daftar Aturan) */}
         {/* ================================================================= */}
-        <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-4">
+        <div className="lg:col-span-4 xl:col-span-3 bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-4">
           <div className="flex items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-bold text-slate-900 tracking-tight">
@@ -564,12 +564,12 @@ export const ReminderSettingsTab: React.FC = () => {
         </div>
 
         {/* ================================================================= */}
-        {/* KOLOM TENGAH (45%) - EDITOR SETTINGS REMINDER */}
+        {/* KOLOM TENGAH (Editor Aturan) */}
         {/* ================================================================= */}
         {activeAutomation ? (
-          <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-6">
+          <div className="lg:col-span-8 xl:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-6">
             {/* Header Editor */}
-            <div className="flex items-center justify-between gap-4 pb-4 border-b border-slate-100">
+            <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
               <div className="space-y-1 flex-1 min-w-0">
                 <input
                   type="text"
@@ -685,16 +685,16 @@ export const ReminderSettingsTab: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-8 text-center text-slate-400 text-xs">
+          <div className="lg:col-span-8 xl:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-8 text-center text-slate-400 text-xs">
             Pilih aturan reminder untuk mengedit.
           </div>
         )}
 
         {/* ================================================================= */}
-        {/* KOLOM KANAN (45%) - REALTIME WHATSAPP PREVIEW */}
+        {/* KOLOM KANAN (Preview) */}
         {/* ================================================================= */}
         {activeAutomation && (
-          <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-5">
+          <div className="lg:col-span-12 xl:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 font-sans">
