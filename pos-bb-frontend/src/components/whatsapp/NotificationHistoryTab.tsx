@@ -22,6 +22,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { CustomSelect } from "../common/CustomSelect";
 import {
   NotificationHistoryLog,
   NotificationStats,
@@ -390,39 +391,39 @@ export const NotificationHistoryTab: React.FC = () => {
           {/* Right: Date Filter, Category Dropdown, Segmented Status Filter */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             {/* 1. Date Range Dropdown */}
-            <select
+            <CustomSelect
               value={dateFilter}
-              onChange={(e) => {
-                setDateFilter(e.target.value);
+              onChange={(val) => {
+                setDateFilter(val);
                 setPage(1);
               }}
-              className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-1 focus:ring-[#25D366] cursor-pointer shadow-2xs"
-            >
-              <option value="all">Semua Waktu</option>
-              <option value="today">Hari ini</option>
-              <option value="7days">7 hari terakhir</option>
-              <option value="30days">30 hari terakhir</option>
-            </select>
+              options={[
+                { value: "all", label: "Semua Waktu" },
+                { value: "today", label: "Hari ini" },
+                { value: "7days", label: "7 hari terakhir" },
+                { value: "30days", label: "30 hari terakhir" },
+              ]}
+            />
 
             {/* 2. Category Dropdown */}
-            <select
+            <CustomSelect
               value={categoryFilter}
-              onChange={(e) => {
-                setCategoryFilter(e.target.value);
+              onChange={(val) => {
+                setCategoryFilter(val);
                 setPage(1);
               }}
-              className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-1 focus:ring-[#25D366] cursor-pointer shadow-2xs"
-            >
-              <option value="Semua kategori">Semua kategori</option>
-              <option value="TEST">Pesan Uji Coba</option>
-              <option value="SERVICE_REMINDER">Service Reminder</option>
-              <option value="WORK_ORDER_CREATED">Work Order Baru</option>
-              <option value="WORK_ORDER_COMPLETED">Work Order Selesai</option>
-              <option value="VEHICLE_READY">Unit Ready</option>
-              <option value="INVOICE_CREATED">Invoice</option>
-              <option value="PAYMENT_RECEIVED">Pembayaran</option>
-              <option value="CUSTOM">Promosi</option>
-            </select>
+              options={[
+                { value: "Semua kategori", label: "Semua kategori" },
+                { value: "TEST", label: "Pesan Uji Coba" },
+                { value: "SERVICE_REMINDER", label: "Service Reminder" },
+                { value: "WORK_ORDER_CREATED", label: "Work Order Baru" },
+                { value: "WORK_ORDER_COMPLETED", label: "Work Order Selesai" },
+                { value: "VEHICLE_READY", label: "Unit Ready" },
+                { value: "INVOICE_CREATED", label: "Invoice" },
+                { value: "PAYMENT_RECEIVED", label: "Pembayaran" },
+                { value: "CUSTOM", label: "Promosi" },
+              ]}
+            />
 
             {/* 3. Compact Segmented Status Filter */}
             <div className="flex items-center p-1 rounded-xl bg-slate-100 border border-slate-200/80">

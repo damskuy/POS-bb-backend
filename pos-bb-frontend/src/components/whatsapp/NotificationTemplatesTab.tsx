@@ -21,10 +21,11 @@ import {
   Calendar,
   Zap,
 } from "lucide-react";
+import { CustomSelect, CustomSelectOption } from "../common/CustomSelect";
 import {
   NotificationTemplate,
   NotificationCategory,
-} from "@/types/notificationTemplate";
+} from "../../types/notificationTemplate";
 import { NotificationTemplateService } from "@/services/notificationTemplate.service";
 
 const CATEGORY_DISPLAY_MAP: Record<string, string> = {
@@ -489,26 +490,24 @@ export const NotificationTemplatesTab: React.FC = () => {
                     {activeTemplate.isActive ? "Active" : "Inactive"}
                   </span>
 
-                  {/* Inline Category Select */}
-                  <select
+                  {/* Inline CustomSelect Category */}
+                  <CustomSelect
                     value={activeTemplate.category}
-                    onChange={(e) =>
-                      updateActiveField(
-                        "category",
-                        e.target.value as NotificationCategory
-                      )
+                    onChange={(val) =>
+                      updateActiveField("category", val as NotificationCategory)
                     }
-                    className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-[#25D366] cursor-pointer max-w-[160px] sm:max-w-[190px] truncate shrink-0"
-                  >
-                    <option value="CUSTOM">Custom (Broadcast)</option>
-                    <option value="WORK_ORDER_CREATED">Pekerjaan Masuk</option>
-                    <option value="WORK_ORDER_COMPLETED">Selesai Servis</option>
-                    <option value="VEHICLE_READY">Unit Ready</option>
-                    <option value="SERVICE_REMINDER">Reminder Servis</option>
-                    <option value="INVOICE_CREATED">Invoice</option>
-                    <option value="PAYMENT_RECEIVED">Pembayaran</option>
-                    <option value="WORK_ORDER_UPDATED">Update Status</option>
-                  </select>
+                    options={[
+                      { value: "CUSTOM", label: "Custom (Broadcast)" },
+                      { value: "WORK_ORDER_CREATED", label: "Pekerjaan Masuk" },
+                      { value: "WORK_ORDER_COMPLETED", label: "Selesai Servis" },
+                      { value: "VEHICLE_READY", label: "Unit Ready" },
+                      { value: "SERVICE_REMINDER", label: "Reminder Servis" },
+                      { value: "INVOICE_CREATED", label: "Invoice" },
+                      { value: "PAYMENT_RECEIVED", label: "Pembayaran" },
+                      { value: "WORK_ORDER_UPDATED", label: "Update Status" },
+                    ]}
+                    buttonClassName="py-1 px-2.5 bg-slate-50 border-slate-200 text-slate-800 hover:bg-slate-100 font-bold"
+                  />
                 </div>
               </div>
 
@@ -798,17 +797,17 @@ export const NotificationTemplatesTab: React.FC = () => {
                           <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
                             Hari Aktif Kirim
                           </label>
-                          <select
+                          <CustomSelect
                             value={activeTemplate.conditions?.sendDays || "Senin - Sabtu"}
-                            onChange={(e) =>
-                              updateConditionField("sendDays", e.target.value)
-                            }
-                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-800"
-                          >
-                            <option value="Senin - Sabtu">Senin - Sabtu</option>
-                            <option value="Setiap Hari">Setiap Hari</option>
-                            <option value="Senin - Jumat">Senin - Jumat (Weekday)</option>
-                          </select>
+                            onChange={(val) => updateConditionField("sendDays", val)}
+                            options={[
+                              { value: "Senin - Sabtu", label: "Senin - Sabtu" },
+                              { value: "Setiap Hari", label: "Setiap Hari" },
+                              { value: "Senin - Jumat", label: "Senin - Jumat (Weekday)" },
+                            ]}
+                            className="w-full"
+                            buttonClassName="w-full justify-between py-1.5 px-2.5 text-xs font-semibold text-slate-800 bg-white border-slate-300"
+                          />
                         </div>
                       </div>
 
