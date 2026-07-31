@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { AiBusinessInsightCard } from "./AiBusinessInsightCard";
 
 // --- Mock Data for Chart ---
 const MOCK_DAILY_REVENUE = [
@@ -56,6 +57,11 @@ export const UnifiedReportsDashboard: React.FC<UnifiedReportsDashboardProps> = (
           <KpiCard title="Average Ticket" value="Rp 172.535" trend="-1.2%" description="vs bulan lalu" trendType="warning" />
           <KpiCard title="Gross Profit" value="Rp 9.800.000" trend="+15.0%" description="vs bulan lalu" />
         </div>
+      </section>
+
+      {/* 1.5. AI Business Insight */}
+      <section>
+        <AiBusinessInsightCard filters={filters} />
       </section>
 
       {/* 2. Revenue Overview & Workshop Insights */}
