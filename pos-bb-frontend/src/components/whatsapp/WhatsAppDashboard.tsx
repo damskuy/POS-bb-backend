@@ -9,6 +9,7 @@ import { WhatsAppSettingsTab } from "./WhatsAppSettingsTab";
 import { ReminderSettingsTab } from "./ReminderSettingsTab";
 import { NotificationTemplatesTab } from "./NotificationTemplatesTab";
 import { NotificationHistoryTab } from "./NotificationHistoryTab";
+import { AutomationControlTab } from "./AutomationControlTab";
 
 export const WhatsAppDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<WhatsAppTabType>("whatsapp-settings");
@@ -29,6 +30,11 @@ export const WhatsAppDashboard: React.FC = () => {
         {activeTab === "whatsapp-settings" && <WhatsAppSettingsTab />}
         {activeTab === "reminder-settings" && <ReminderSettingsTab />}
         {activeTab === "notification-templates" && <NotificationTemplatesTab />}
+        {activeTab === "automation-control" && (
+          <AutomationControlTab
+            onNavigateToTemplates={() => setActiveTab("notification-templates")}
+          />
+        )}
         {activeTab === "notification-history" && <NotificationHistoryTab />}
       </div>
     </PageContainer>

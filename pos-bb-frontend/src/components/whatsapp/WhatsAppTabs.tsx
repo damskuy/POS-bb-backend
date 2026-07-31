@@ -1,12 +1,13 @@
 "use client";
 
 import React from "react";
-import { Settings, CalendarClock, FileText, History } from "lucide-react";
+import { Settings, CalendarClock, FileText, History, Zap } from "lucide-react";
 
 export type WhatsAppTabType =
   | "whatsapp-settings"
   | "reminder-settings"
   | "notification-templates"
+  | "automation-control"
   | "notification-history";
 
 interface WhatsAppTabsProps {
@@ -33,6 +34,11 @@ export const WhatsAppTabs: React.FC<WhatsAppTabsProps> = ({
       id: "notification-templates" as WhatsAppTabType,
       label: "Notification Templates",
       icon: FileText,
+    },
+    {
+      id: "automation-control" as WhatsAppTabType,
+      label: "Automation Control",
+      icon: Zap,
     },
     {
       id: "notification-history" as WhatsAppTabType,
