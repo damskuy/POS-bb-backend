@@ -35,6 +35,9 @@ export interface NotificationHistoryLog {
   errorMessage: string | null;
   retryCount: number;
   sentAt: string | null;
+  automationId?: number | null;
+  workOrderId?: number | null;
+  trigger?: string | null;
   createdAt: string;
   updatedAt: string;
 }

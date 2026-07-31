@@ -13,21 +13,27 @@ import {
   X,
   Copy,
   CheckCheck,
-  Trash2,
-  Check,
-  Car,
   Info,
   AlertCircle,
   ChevronLeft,
   ChevronRight,
+  Loader2,
+  Database,
+  Filter,
 } from "lucide-react";
 import { CustomSelect } from "../common/CustomSelect";
+import { useToast } from "@/components/common/Toast";
 import {
   NotificationHistoryLog,
   NotificationStats,
   NotificationStatus,
 } from "@/types/notificationHistory";
 import { NotificationHistoryService } from "@/services/notificationHistory.service";
+import { WorkOrderService } from "@/services/workorder.service";
+
+// ─────────────────────────────────────────────
+// CONSTANTS & MAPS
+// ─────────────────────────────────────────────
 
 const CATEGORY_LABEL_MAP: Record<string, string> = {
   TEST: "Pesan Uji Coba",
@@ -43,7 +49,19 @@ const CATEGORY_LABEL_MAP: Record<string, string> = {
   CUSTOM: "Promosi",
 };
 
+const TRIGGER_LABEL_MAP: Record<string, string> = {
+  WORK_ORDER_CREATED: "WO Dibuat",
+  WORK_ORDER_IN_PROGRESS: "Pengerjaan Dimulai",
+  WORK_ORDER_COMPLETED: "Pekerjaan Selesai",
+};
+
+// ─────────────────────────────────────────────
+// MAIN COMPONENT
+// ─────────────────────────────────────────────
+
 export const NotificationHistoryTab: React.FC = () => {
+  const { showToast } = useToast();
+
   // Data States
   const [logs, setLogs] = useState<NotificationHistoryLog[]>([]);
   const [stats, setStats] = useState<NotificationStats>({
@@ -66,22 +84,22 @@ export const NotificationHistoryTab: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("Semua kategori");
   const [dateFilter, setDateFilter] = useState("all");
+  const [sumberFilter, setSumberFilter] = useState("all"); // 'all' | 'automation' | 'reminder' | 'manual'
 
-  // Selection & Active Log
+  // Selection & Drawer Details
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [activeDrawerLog, setActiveDrawerLog] =
-    useState<NotificationHistoryLog | null>(null);
+  const [activeDrawerLog, setActiveDrawerLog] = useState<NotificationHistoryLog | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState<string | null>(null);
 
-  // Helper Toast Feedback
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
+  // Dynamically loaded Work Order Details
+  const [activeWorkOrder, setActiveWorkOrder] = useState<any | null>(null);
+  const [isLoadingWorkOrder, setIsLoadingWorkOrder] = useState(false);
 
-  // Fetch History & Stats
+  // ─────────────────────────────────────────────
+  // FETCH LOGS
+  // ─────────────────────────────────────────────
+
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setErrorMsg(null);
@@ -106,8 +124,7 @@ export const NotificationHistoryTab: React.FC = () => {
           limit,
           search: search.trim() || undefined,
           status: statusFilter !== "all" ? statusFilter : undefined,
-          category:
-            categoryFilter !== "Semua kategori" ? categoryFilter : undefined,
+          category: categoryFilter !== "Semua kategori" ? categoryFilter : undefined,
           startDate: startDateStr,
         }),
         NotificationHistoryService.getStats(),
@@ -121,9 +138,7 @@ export const NotificationHistoryTab: React.FC = () => {
       setStats(statsRes);
     } catch (err: any) {
       console.error("Failed to load notification history:", err);
-      setErrorMsg(
-        err.message || "Gagal memuat data riwayat notifikasi dari server."
-      );
+      setErrorMsg(err.message || "Gagal memuat data riwayat notifikasi dari server.");
     } finally {
       setIsLoading(false);
     }
@@ -133,83 +148,48 @@ export const NotificationHistoryTab: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
-  // Handle Search Input Debounce / Submit
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value);
-    setPage(1);
-  };
-
-
-
-  // Single Retry Action
-  const handleRetrySingle = async (id: string) => {
-    setIsRetrying(id);
-    setActiveMenuId(null);
-    try {
-      const updated = await NotificationHistoryService.retryNotification(id);
-
-      setLogs((prev) => prev.map((log) => (log.id === id ? updated : log)));
-      if (activeDrawerLog?.id === id) {
-        setActiveDrawerLog(updated);
-      }
-
-      showToast(
-        updated.status === "SENT" || updated.status === "DELIVERED"
-          ? "✓ Notifikasi berhasil dikirim ulang!"
-          : "⚠️ Percobaan kirim ulang gagal: " + (updated.errorMessage || "")
-      );
-
-      // Refresh Stats
-      const newStats = await NotificationHistoryService.getStats();
-      setStats(newStats);
-    } catch (err: any) {
-      console.error("Failed to retry notification:", err);
-      showToast("❌ " + (err.message || "Gagal mengirim ulang notifikasi."));
-    } finally {
-      setIsRetrying(null);
-    }
-  };
-
-  // Selection Checkbox Logic
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedIds(logs.map((l) => l.id));
+  // Fetch Work Order on drawer open
+  useEffect(() => {
+    if (activeDrawerLog && activeDrawerLog.workOrderId) {
+      setIsLoadingWorkOrder(true);
+      setActiveWorkOrder(null);
+      WorkOrderService.getWorkOrderById(activeDrawerLog.workOrderId)
+        .then((res) => {
+          setActiveWorkOrder(res);
+        })
+        .catch((err) => {
+          console.error("Failed to load work order:", err);
+        })
+        .finally(() => {
+          setIsLoadingWorkOrder(false);
+        });
     } else {
-      setSelectedIds([]);
+      setActiveWorkOrder(null);
+      setIsLoadingWorkOrder(false);
+    }
+  }, [activeDrawerLog]);
+
+  // ─────────────────────────────────────────────
+  // HELPERS
+  // ─────────────────────────────────────────────
+
+  const getNotificationSource = (log: NotificationHistoryLog) => {
+    if (log.automationId || log.trigger) return "Automation";
+    if (log.category === "SERVICE_REMINDER") return "Reminder";
+    return "Manual/Test";
+  };
+
+  const getSourceBadgeClass = (source: string) => {
+    switch (source) {
+      case "Automation":
+        return "bg-indigo-50 text-indigo-700 border-indigo-200/80";
+      case "Reminder":
+        return "bg-purple-50 text-purple-700 border-purple-200/80";
+      default:
+        return "bg-slate-50 text-slate-700 border-slate-200/80";
     }
   };
 
-  const handleSelectOne = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
-
-  // Format Helper Date
-  const formatExactTime = (dateStr?: string | null) => {
-    if (!dateStr) return "-";
-    const d = new Date(dateStr);
-    return d.toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  // Get Initials for Avatar
-  const getInitials = (name?: string | null) => {
-    if (!name || !name.trim()) return "WA";
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .substring(0, 2)
-      .toUpperCase();
-  };
-
-  // Helper for Category Label styling
   const getCategoryBadgeClass = (category: string) => {
     switch (category) {
       case "SERVICE_REMINDER":
@@ -234,156 +214,272 @@ export const NotificationHistoryTab: React.FC = () => {
     }
   };
 
-  // Helper for Status Badge styling
   const renderStatusBadge = (status: NotificationStatus) => {
     switch (status) {
-      case "SENT":
-      case "DELIVERED":
+      case "SIMULATED":
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            <span>Berhasil</span>
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200/80">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" />
+            <span>Simulasi</span>
           </span>
         );
       case "PENDING":
-      case "PROCESSING":
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80">
-            <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            <span>{status === "PROCESSING" ? "Diproses" : "Pending"}</span>
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-600 border border-amber-200/80">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+            <span>Pending</span>
           </span>
         );
-      case "SIMULATED":
+      case "PROCESSING":
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200/80">
-            <Info className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-            <span>Simulasi</span>
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80">
+            <Loader2 className="w-3 h-3 text-indigo-600 shrink-0 animate-spin" />
+            <span>Diproses</span>
+          </span>
+        );
+      case "SENT":
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+            <span>Terkirim</span>
+          </span>
+        );
+      case "DELIVERED":
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300/80">
+            <CheckCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span>Diterima</span>
           </span>
         );
       case "FAILED":
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/80">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/80">
             <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
             <span>Gagal</span>
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-50 text-slate-700 border border-slate-200/80">
+            <span>{status}</span>
           </span>
         );
     }
   };
 
+  const formatExactTime = (dateStr?: string | null) => {
+    if (!dateStr) return "-";
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getInitials = (name?: string | null) => {
+    if (!name || !name.trim()) return "WA";
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .substring(0, 2)
+      .toUpperCase();
+  };
+
+  // ─────────────────────────────────────────────
+  // HANDLERS
+  // ─────────────────────────────────────────────
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value);
+    setPage(1);
+  };
+
+  const handleRetrySingle = async (id: string) => {
+    setIsRetrying(id);
+    setActiveMenuId(null);
+    try {
+      const updated = await NotificationHistoryService.retryNotification(id);
+      setLogs((prev) => prev.map((log) => (log.id === id ? updated : log)));
+      if (activeDrawerLog?.id === id) {
+        setActiveDrawerLog(updated);
+      }
+      showToast(
+        updated.status === "SENT" || updated.status === "DELIVERED"
+          ? "✓ Notifikasi berhasil dikirim ulang!"
+          : "⚠️ Percobaan kirim ulang gagal: " + (updated.errorMessage || "")
+      );
+      const newStats = await NotificationHistoryService.getStats();
+      setStats(newStats);
+    } catch (err: any) {
+      console.error("Failed to retry notification:", err);
+      showToast("❌ " + (err.message || "Gagal mengirim ulang notifikasi."));
+    } finally {
+      setIsRetrying(null);
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(filteredLogs.map((l) => l.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleResetFilters = () => {
+    setSearch("");
+    setStatusFilter("all");
+    setCategoryFilter("Semua kategori");
+    setDateFilter("all");
+    setSumberFilter("all");
+    setPage(1);
+  };
+
+  // ─────────────────────────────────────────────
+  // CLIENT FILTERING (sumberFilter)
+  // ─────────────────────────────────────────────
+
+  const filteredLogs = logs.filter((log) => {
+    if (sumberFilter === "all") return true;
+    const isAutomation = !!(log.automationId || log.trigger);
+    const isReminder = log.category === "SERVICE_REMINDER";
+    if (sumberFilter === "automation") return isAutomation;
+    if (sumberFilter === "reminder") return isReminder;
+    if (sumberFilter === "manual") return !isAutomation && !isReminder;
+    return true;
+  });
+
+  const isAnyFilterActive =
+    search.trim() !== "" ||
+    statusFilter !== "all" ||
+    categoryFilter !== "Semua kategori" ||
+    dateFilter !== "all" ||
+    sumberFilter !== "all";
+
+  // ─────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────
+
   return (
-    <div className="space-y-5 animate-fadeIn font-sans text-slate-800">
-      {/* Toast Feedback Notification */}
-      {toastMessage && (
-        <div className="fixed top-5 right-5 z-50 px-4 py-3 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-xl flex items-center gap-2 animate-fadeIn">
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* SECTION 1 — COMPACT ACTIVITY SUMMARY (4 Dense Cards Real Data) */}
-      {/* ========================================================================= */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* 1. Total Terkirim Hari Ini */}
-        <div className="bg-white rounded-xl border border-slate-200/80 p-3.5 shadow-xs flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div className="space-y-0.5">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Total Hari Ini
-              </span>
-              <div className="text-xl font-extrabold text-slate-900 font-sans tracking-tight">
-                {stats.totalToday}
-              </div>
-            </div>
-            <div className="p-2 rounded-lg bg-slate-100 text-slate-600 border border-slate-200/60 shrink-0">
-              <Send className="w-4 h-4 text-slate-600" />
+    <div className="space-y-4 font-sans text-slate-800 animate-fadeIn">
+      {/* SECTION 1 — ACTIVITY SUMMARY CARDS */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Total Today */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            Total Hari Ini
+          </span>
+          <div className="flex items-baseline justify-between mt-1">
+            <span className="text-xl font-black text-slate-900">{stats.totalToday}</span>
+            <div className="p-1.5 rounded-lg bg-slate-50 border border-slate-100 text-slate-400 shrink-0">
+              <Send className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-[11px] text-slate-500 font-normal mt-2.5 pt-2 border-t border-slate-100">
-            Seluruh notifikasi diproses hari ini.
-          </p>
         </div>
 
-        {/* 2. Berhasil Terkirim */}
-        <div className="bg-white rounded-xl border border-slate-200/80 p-3.5 shadow-xs flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div className="space-y-0.5">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Berhasil Terkirim
-              </span>
-              <div className="text-xl font-extrabold text-emerald-700 font-sans tracking-tight">
-                {stats.sentToday}
-              </div>
-            </div>
-            <div className="p-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 shrink-0">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+        {/* Berhasil */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            Berhasil Terkirim
+          </span>
+          <div className="flex items-baseline justify-between mt-1">
+            <span className="text-xl font-black text-emerald-600">{stats.sentToday}</span>
+            <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-500 shrink-0">
+              <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-[11px] text-slate-500 font-normal mt-2.5 pt-2 border-t border-slate-100">
-            Pesan berhasil terkirim via provider.
-          </p>
         </div>
 
-        {/* 3. Menunggu Diproses */}
-        <div className="bg-white rounded-xl border border-slate-200/80 p-3.5 shadow-xs flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div className="space-y-0.5">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Menunggu Diproses
-              </span>
-              <div className="text-xl font-extrabold text-amber-700 font-sans tracking-tight">
-                {stats.pending}
-              </div>
-            </div>
-            <div className="p-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-100 shrink-0">
-              <Clock className="w-4 h-4 text-amber-600" />
+        {/* Pending */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            Antrean Pending
+          </span>
+          <div className="flex items-baseline justify-between mt-1">
+            <span className="text-xl font-black text-amber-600">{stats.pending}</span>
+            <div className="p-1.5 rounded-lg bg-amber-50 text-amber-500 shrink-0">
+              <Clock className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-[11px] text-slate-500 font-normal mt-2.5 pt-2 border-t border-slate-100">
-            Sedang berada dalam antrean pengiriman.
-          </p>
         </div>
 
-        {/* 4. Gagal Terkirim */}
-        <div className="bg-white rounded-xl border border-slate-200/80 p-3.5 shadow-xs flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div className="space-y-0.5">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Gagal Terkirim
-              </span>
-              <div className="text-xl font-extrabold text-rose-700 font-sans tracking-tight">
-                {stats.failed}
-              </div>
-            </div>
-            <div className="p-2 rounded-lg bg-rose-50 text-rose-700 border border-rose-100 shrink-0">
-              <AlertTriangle className="w-4 h-4 text-rose-600" />
+        {/* Gagal */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            Gagal Terkirim
+          </span>
+          <div className="flex items-baseline justify-between mt-1">
+            <span className="text-xl font-black text-rose-600">{stats.failed}</span>
+            <div className="p-1.5 rounded-lg bg-rose-50 text-rose-500 shrink-0">
+              <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-[11px] text-slate-500 font-normal mt-2.5 pt-2 border-t border-slate-100">
-            Memerlukan pengiriman ulang (retry).
-          </p>
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* SECTION 2 — HISTORY TOOLBAR (Search, Filters, Reset) */}
-      {/* ========================================================================= */}
-      <div className="bg-white rounded-xl border border-slate-200/80 p-3.5 shadow-xs space-y-3">
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-          {/* Left: Search Input */}
-          <div className="relative flex-1 min-w-[280px]">
+      {/* SECTION 2 — HISTORY TOOLBAR */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs space-y-3">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[240px]">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Cari nama penerima, nomor WhatsApp, atau isi pesan..."
+              placeholder="Cari penerima, nomor, isi pesan..."
               value={search}
               onChange={handleSearchChange}
-              className="w-full pl-10 pr-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#25D366]/30 focus:border-[#25D366] bg-slate-50/50"
+              className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#25D366]/30 focus:border-[#25D366] bg-slate-50/50"
             />
           </div>
 
-          {/* Right: Date Filter, Category Dropdown, Segmented Status Filter */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {/* 1. Date Range Dropdown */}
+          {/* Filters & Refresh */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Sumber Filter */}
+            <CustomSelect
+              value={sumberFilter}
+              onChange={(val) => {
+                setSumberFilter(val);
+                setPage(1);
+              }}
+              options={[
+                { value: "all", label: "Semua Sumber" },
+                { value: "automation", label: "Automation" },
+                { value: "reminder", label: "Reminder" },
+                { value: "manual", label: "Manual/Test" },
+              ]}
+              buttonClassName="py-2 text-xs"
+            />
+
+            {/* Status Filter */}
+            <CustomSelect
+              value={statusFilter}
+              onChange={(val) => {
+                setStatusFilter(val);
+                setPage(1);
+              }}
+              options={[
+                { value: "all", label: "Semua Status" },
+                { value: "SIMULATED", label: "Simulasi" },
+                { value: "PENDING", label: "Pending" },
+                { value: "PROCESSING", label: "Diproses" },
+                { value: "SENT", label: "Terkirim" },
+                { value: "DELIVERED", label: "Diterima" },
+                { value: "FAILED", label: "Gagal" },
+              ]}
+              buttonClassName="py-2 text-xs"
+            />
+
+            {/* Date Range Dropdown */}
             <CustomSelect
               value={dateFilter}
               onChange={(val) => {
@@ -396,88 +492,70 @@ export const NotificationHistoryTab: React.FC = () => {
                 { value: "7days", label: "7 hari terakhir" },
                 { value: "30days", label: "30 hari terakhir" },
               ]}
+              buttonClassName="py-2 text-xs"
             />
 
-            {/* 2. Category Dropdown */}
-            <CustomSelect
-              value={categoryFilter}
-              onChange={(val) => {
-                setCategoryFilter(val);
-                setPage(1);
-              }}
-              options={[
-                { value: "Semua kategori", label: "Semua kategori" },
-                { value: "TEST", label: "Pesan Uji Coba" },
-                { value: "SERVICE_REMINDER", label: "Service Reminder" },
-                { value: "WORK_ORDER_CREATED", label: "Work Order Baru" },
-                { value: "WORK_ORDER_COMPLETED", label: "Work Order Selesai" },
-                { value: "VEHICLE_READY", label: "Unit Ready" },
-                { value: "INVOICE_CREATED", label: "Invoice" },
-                { value: "PAYMENT_RECEIVED", label: "Pembayaran" },
-                { value: "CUSTOM", label: "Promosi" },
-              ]}
-            />
-
-            {/* 3. Compact Segmented Status Filter */}
-            <div className="flex items-center p-1 rounded-xl bg-slate-100 border border-slate-200/80">
-              {[
-                { id: "all", label: "Semua" },
-                { id: "SENT", label: "Berhasil" },
-                { id: "PENDING", label: "Pending" },
-                { id: "FAILED", label: "Gagal" },
-              ].map((st) => (
-                <button
-                  key={st.id}
-                  type="button"
-                  onClick={() => {
-                    setStatusFilter(st.id);
-                    setPage(1);
-                  }}
-                  className={`px-3 py-1 rounded-lg text-xs transition-all select-none cursor-pointer ${
-                    statusFilter === st.id
-                      ? "bg-slate-900 text-white font-bold shadow-xs"
-                      : "text-slate-600 hover:text-slate-900 font-medium"
-                  }`}
-                >
-                  {st.label}
-                </button>
-              ))}
-            </div>
-
+            {/* Refresh Button */}
+            <button
+              type="button"
+              onClick={fetchData}
+              title="Refresh Data"
+              className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer active:scale-95 shrink-0"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+            </button>
           </div>
         </div>
+
+        {/* Active Filter Clear Helper */}
+        {isAnyFilterActive && (
+          <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+            <span className="text-[11px] text-slate-400 italic">
+              Filter aktif diterapkan. Beberapa hasil mungkin tersembunyi.
+            </span>
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="text-[11px] font-bold text-[#25D366] hover:text-emerald-700 transition-colors"
+            >
+              Reset Semua Filter
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* ========================================================================= */}
-      {/* SECTION 3 — NOTIFICATION ACTIVITY TABLE */}
-      {/* ========================================================================= */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
-        {/* LOADING STATE */}
+      {/* SECTION 3 — TABLE CONTENT */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+        {/* Loading Skeleton */}
         {isLoading && (
-          <div className="p-8 space-y-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="h-12 bg-slate-100 animate-pulse rounded-xl"
-              />
+          <div className="divide-y divide-slate-100">
+            <div className="bg-slate-50/80 h-10 animate-pulse" />
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="p-4 space-y-3 animate-pulse">
+                <div className="flex justify-between">
+                  <div className="h-4 bg-slate-200 rounded w-1/4" />
+                  <div className="h-4 bg-slate-200 rounded w-16" />
+                </div>
+                <div className="h-3 bg-slate-100 rounded w-3/4" />
+              </div>
             ))}
           </div>
         )}
 
-        {/* ERROR STATE */}
+        {/* Error State */}
         {!isLoading && errorMsg && (
-          <div className="p-8 text-center space-y-3 bg-rose-50/50">
-            <AlertCircle className="w-8 h-8 text-rose-600 mx-auto" />
+          <div className="p-10 text-center space-y-3">
+            <AlertCircle className="w-9 h-9 text-rose-500 mx-auto" />
             <div>
-              <h4 className="text-xs font-bold text-rose-900">{errorMsg}</h4>
-              <p className="text-[11px] text-rose-600 mt-1">
-                Pastikan koneksi backend terhubung dengan benar.
+              <h4 className="text-xs font-bold text-slate-800">Gagal Memuat Riwayat Notifikasi</h4>
+              <p className="text-[11px] text-slate-400 mt-1 max-w-xs mx-auto">
+                {errorMsg}
               </p>
             </div>
             <button
               type="button"
               onClick={fetchData}
-              className="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors inline-flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Coba Lagi</span>
@@ -485,47 +563,48 @@ export const NotificationHistoryTab: React.FC = () => {
           </div>
         )}
 
-        {/* TABLE CONTENT */}
+        {/* Data Table */}
         {!isLoading && !errorMsg && (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-sans">
-                <thead className="bg-slate-50/80 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200/80">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50/80 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200/80 select-none">
                   <tr>
                     <th className="py-3 px-3.5 w-10">
                       <input
                         type="checkbox"
                         checked={
-                          logs.length > 0 && selectedIds.length === logs.length
+                          filteredLogs.length > 0 && selectedIds.length === filteredLogs.length
                         }
                         onChange={(e) => handleSelectAll(e.target.checked)}
                         className="rounded text-[#25D366] focus:ring-[#25D366] cursor-pointer"
                       />
                     </th>
-                    <th className="py-3 px-4 min-w-[180px]">Penerima</th>
+                    <th className="py-3 px-4 min-w-[160px]">Penerima</th>
                     <th className="py-3 px-4 min-w-[280px]">Pesan WhatsApp</th>
                     <th className="py-3 px-4 min-w-[110px]">Status</th>
-                    <th className="py-3 px-4 min-w-[140px]">Waktu Kirim</th>
-                    <th className="py-3 px-4 text-right w-20">Aksi</th>
+                    <th className="py-3 px-4 min-w-[130px]">Waktu Kirim</th>
+                    <th className="py-3 px-4 text-right w-16">Aksi</th>
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                  {logs.map((log) => {
+                <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                  {filteredLogs.map((log) => {
                     const isSelected = selectedIds.includes(log.id);
                     const isFailed = log.status === "FAILED";
-                    const displayCategory =
-                      CATEGORY_LABEL_MAP[log.category] || log.category;
+                    const isSimulated = log.status === "SIMULATED";
+                    const displayCategory = CATEGORY_LABEL_MAP[log.category] || log.category;
+                    const source = getNotificationSource(log);
 
                     return (
                       <tr
                         key={log.id}
                         className={`group transition-colors duration-150 ${
                           isFailed
-                            ? "border-l-4 border-l-rose-500 bg-rose-50/20 hover:bg-rose-50/40"
+                            ? "border-l-4 border-l-rose-500 bg-rose-50/15 hover:bg-rose-50/25"
                             : isSelected
-                            ? "bg-emerald-50/40"
-                            : "hover:bg-slate-50/80"
+                            ? "bg-emerald-50/30"
+                            : "hover:bg-slate-50/50"
                         }`}
                       >
                         {/* Checkbox */}
@@ -538,90 +617,96 @@ export const NotificationHistoryTab: React.FC = () => {
                           />
                         </td>
 
-                        {/* Column 1: Recipient Avatar + Name + Phone */}
+                        {/* Recipient */}
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-3">
                             <div
-                              className={`w-9 h-9 rounded-full font-extrabold text-xs flex items-center justify-center shrink-0 border ${
+                              className={`w-8 h-8 rounded-full font-black text-xs flex items-center justify-center shrink-0 border select-none ${
                                 isFailed
-                                  ? "bg-rose-100 text-rose-800 border-rose-200"
-                                  : log.status === "PENDING" ||
-                                    log.status === "PROCESSING"
-                                  ? "bg-amber-100 text-amber-800 border-amber-200"
-                                  : "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                  ? "bg-rose-50 text-rose-700 border-rose-100"
+                                  : isSimulated
+                                  ? "bg-sky-50 text-sky-700 border-sky-100"
+                                  : "bg-emerald-50 text-emerald-700 border-emerald-100"
                               }`}
                             >
                               {getInitials(log.recipientName)}
                             </div>
-
-                            <div className="space-y-0.5">
-                              <div className="font-bold text-slate-900 font-sans group-hover:text-[#128C7E] transition-colors">
-                                {log.recipientName || "Penerima WA"}
+                            <div className="min-w-0">
+                              <div className="font-bold text-slate-900 truncate">
+                                {log.recipientName || "Pelanggan"}
                               </div>
-                              <div className="text-[11px] text-slate-500 font-mono font-medium">
+                              <div className="text-[10px] text-slate-400 font-mono mt-0.5">
                                 {log.recipientPhone}
                               </div>
                             </div>
                           </div>
                         </td>
 
-                        {/* Column 2: Notification Category Label + Message Preview */}
+                        {/* Message Preview & Badges */}
                         <td className="py-3.5 px-4">
-                          <div className="space-y-1 max-w-md">
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${getCategoryBadgeClass(
-                                log.category
-                              )}`}
-                            >
-                              {displayCategory}
-                            </span>
-
-                            <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed font-normal">
+                          <div className="space-y-1.5 max-w-md">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span
+                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${getSourceBadgeClass(
+                                  source
+                                )}`}
+                              >
+                                {source}
+                              </span>
+                              <span
+                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${getCategoryBadgeClass(
+                                  log.category
+                                )}`}
+                              >
+                                {displayCategory}
+                              </span>
+                              {log.trigger && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                                  {TRIGGER_LABEL_MAP[log.trigger] || log.trigger}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-600 line-clamp-2 font-normal leading-relaxed">
                               {log.message}
                             </p>
                           </div>
                         </td>
 
-                        {/* Column 3: Status Badge */}
-                        <td className="py-3.5 px-4">
-                          {renderStatusBadge(log.status)}
-                        </td>
+                        {/* Status */}
+                        <td className="py-3.5 px-4">{renderStatusBadge(log.status)}</td>
 
-                        {/* Column 4: Sent Time */}
-                        <td className="py-3.5 px-4 space-y-0.5">
-                          <div className="font-bold text-slate-800 text-xs font-sans">
+                        {/* Time */}
+                        <td className="py-3.5 px-4">
+                          <div className="text-slate-800 text-[11px]">
                             {formatExactTime(log.sentAt || log.createdAt)}
                           </div>
-                          <div className="text-[10px] text-slate-400 font-normal">
+                          <div className="text-[10px] text-slate-400 font-normal mt-0.5">
                             {log.provider ? `via ${log.provider}` : "Fonnte"}
                           </div>
                         </td>
 
-                        {/* Column 5: Action (Eye icon & More menu) */}
+                        {/* Actions */}
                         <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5 relative">
-                            {/* Eye Button: Open Detail Drawer */}
+                          <div className="flex items-center justify-end gap-1 relative">
+                            {/* Eye Detail */}
                             <button
                               type="button"
                               onClick={() => setActiveDrawerLog(log)}
-                              title="Lihat Detail Notifikasi"
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
                             >
-                              <Eye className="w-4 h-4" />
+                              <Eye className="w-3.5 h-3.5" />
                             </button>
 
-                            {/* More Menu Dropdown */}
+                            {/* Dropdown Menu */}
                             <div className="relative">
                               <button
                                 type="button"
                                 onClick={() =>
-                                  setActiveMenuId(
-                                    activeMenuId === log.id ? null : log.id
-                                  )
+                                  setActiveMenuId(activeMenuId === log.id ? null : log.id)
                                 }
                                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
                               >
-                                <MoreVertical className="w-4 h-4" />
+                                <MoreVertical className="w-3.5 h-3.5" />
                               </button>
 
                               {activeMenuId === log.id && (
@@ -630,27 +715,22 @@ export const NotificationHistoryTab: React.FC = () => {
                                     className="fixed inset-0 z-20"
                                     onClick={() => setActiveMenuId(null)}
                                   />
-                                  <div className="absolute right-0 mt-1 w-48 bg-white rounded-xl border border-slate-200 shadow-xl py-1.5 z-30 font-sans text-xs animate-fadeIn text-left">
-                                    {isFailed && (
+                                  <div className="absolute right-0 mt-1 w-44 bg-white rounded-xl border border-slate-200 shadow-xl py-1 z-30 font-sans text-xs text-left animate-fadeIn">
+                                    {/* Retry: Only for FAILED status, never for SIMULATED */}
+                                    {isFailed && !isSimulated && (
                                       <button
                                         type="button"
                                         disabled={isRetrying === log.id}
-                                        onClick={() =>
-                                          handleRetrySingle(log.id)
-                                        }
-                                        className="w-full px-3.5 py-2 text-emerald-700 font-bold hover:bg-emerald-50 flex items-center gap-2 disabled:opacity-50"
+                                        onClick={() => handleRetrySingle(log.id)}
+                                        className="w-full px-3 py-2 text-emerald-700 font-bold hover:bg-emerald-50 flex items-center gap-2 cursor-pointer disabled:opacity-50"
                                       >
                                         <RefreshCw
-                                          className={`w-3.5 h-3.5 text-emerald-600 ${
-                                            isRetrying === log.id
-                                              ? "animate-spin"
-                                              : ""
+                                          className={`w-3 h-3 text-emerald-600 ${
+                                            isRetrying === log.id ? "animate-spin" : ""
                                           }`}
                                         />
                                         <span>
-                                          {isRetrying === log.id
-                                            ? "Mengirim..."
-                                            : "Coba Kirim Ulang"}
+                                          {isRetrying === log.id ? "Mengirim..." : "Kirim Ulang"}
                                         </span>
                                       </button>
                                     )}
@@ -661,26 +741,22 @@ export const NotificationHistoryTab: React.FC = () => {
                                         setActiveDrawerLog(log);
                                         setActiveMenuId(null);
                                       }}
-                                      className="w-full px-3.5 py-2 text-slate-700 font-semibold hover:bg-slate-50 flex items-center gap-2"
+                                      className="w-full px-3 py-2 text-slate-600 font-semibold hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
                                     >
-                                      <Info className="w-3.5 h-3.5 text-slate-400" />
-                                      <span>Lihat Detail Log</span>
+                                      <Info className="w-3 h-3 text-slate-400" />
+                                      <span>Detail Log</span>
                                     </button>
 
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        navigator.clipboard?.writeText(
-                                          log.recipientPhone
-                                        );
+                                        navigator.clipboard?.writeText(log.recipientPhone);
                                         setActiveMenuId(null);
-                                        showToast(
-                                          `✓ Nomor ${log.recipientPhone} tersalin!`
-                                        );
+                                        showToast(`✓ Nomor ${log.recipientPhone} tersalin!`);
                                       }}
-                                      className="w-full px-3.5 py-2 text-slate-700 font-semibold hover:bg-slate-50 flex items-center gap-2"
+                                      className="w-full px-3 py-2 text-slate-600 font-semibold hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
                                     >
-                                      <Copy className="w-3.5 h-3.5 text-slate-400" />
+                                      <Copy className="w-3 h-3 text-slate-400" />
                                       <span>Salin Nomor WA</span>
                                     </button>
                                   </div>
@@ -696,29 +772,50 @@ export const NotificationHistoryTab: React.FC = () => {
               </table>
             </div>
 
-            {/* EMPTY STATE */}
-            {logs.length === 0 && (
-              <div className="p-12 text-center text-slate-500 space-y-3 font-sans border-t border-slate-100">
-                <Send className="w-8 h-8 text-slate-300 mx-auto" />
-                <div>
-                  <h4 className="text-xs font-bold text-slate-800">
-                    Belum Ada Riwayat Notifikasi
-                  </h4>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Seluruh percobaan pengiriman pesan WhatsApp akan tercatat di
-                    sini secara real-time.
-                  </p>
-                </div>
+            {/* Empty Filter / Database State */}
+            {filteredLogs.length === 0 && (
+              <div className="p-16 text-center space-y-4">
+                {isAnyFilterActive ? (
+                  <>
+                    <Filter className="w-8 h-8 text-slate-300 mx-auto" />
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800">
+                        Hasil Filter Tidak Ditemukan
+                      </h4>
+                      <p className="text-[11px] text-slate-400 mt-1 max-w-xs mx-auto">
+                        Tidak ada log notifikasi yang cocok dengan filter atau kata kunci Anda.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleResetFilters}
+                      className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      Reset Filter
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Database className="w-8 h-8 text-slate-300 mx-auto" />
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800">
+                        Belum Ada Riwayat Notifikasi
+                      </h4>
+                      <p className="text-[11px] text-slate-400 mt-1 max-w-xs mx-auto">
+                        Seluruh eksekusi pesan otomatis dan pesan tes akan tersimpan di sini.
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
-            {/* PAGINATION FOOTER */}
-            {logs.length > 0 && (
-              <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between text-xs text-slate-500 font-sans">
+            {/* Pagination Footer */}
+            {filteredLogs.length > 0 && (
+              <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between text-xs text-slate-500 select-none">
                 <div>
-                  Menampilkan <span className="font-bold">{logs.length}</span>{" "}
-                  dari <span className="font-bold">{totalRecords}</span> log
-                  notifikasi
+                  Menampilkan <span className="font-bold">{filteredLogs.length}</span> dari{" "}
+                  <span className="font-bold">{totalRecords}</span> log
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -726,12 +823,12 @@ export const NotificationHistoryTab: React.FC = () => {
                     type="button"
                     disabled={page <= 1}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
 
-                  <span className="font-bold text-slate-700 px-2">
+                  <span className="font-bold text-slate-700 px-1">
                     Halaman {page} dari {totalPages}
                   </span>
 
@@ -739,7 +836,7 @@ export const NotificationHistoryTab: React.FC = () => {
                     type="button"
                     disabled={page >= totalPages}
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
@@ -750,50 +847,46 @@ export const NotificationHistoryTab: React.FC = () => {
         )}
       </div>
 
-      {/* ========================================================================= */}
-      {/* DRAWER / MODAL DETAIL LOG NOTIFIKASI */}
-      {/* ========================================================================= */}
+      {/* DRAWER LOG DETAIL */}
       {activeDrawerLog && (
-        <div className="fixed inset-0 z-50 flex justify-end">
+        <div className="fixed inset-0 z-50 flex justify-end animate-fadeIn">
+          {/* Overlay */}
           <div
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs animate-fadeIn"
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs"
             onClick={() => setActiveDrawerLog(null)}
           />
 
-          <div className="relative bg-white w-full max-w-md h-full shadow-2xl z-10 flex flex-col font-sans animate-slideInRight">
-            {/* Header Drawer */}
+          {/* Drawer container */}
+          <div className="relative bg-white w-full max-w-md h-full shadow-2xl z-10 flex flex-col animate-slideInRight">
+            {/* Header */}
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-[#128C7E] flex items-center justify-center border border-emerald-200 font-extrabold text-xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 font-extrabold text-[11px] shrink-0">
                   WA
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-sans">
-                    Detail Riwayat Notifikasi
-                  </h3>
-                  <p className="text-[11px] text-slate-400 font-mono">
-                    ID: {activeDrawerLog.id}
-                  </p>
+                <div className="min-w-0">
+                  <h3 className="text-xs font-bold text-slate-900 truncate">Detail Log Notifikasi</h3>
+                  <p className="text-[10px] text-slate-400 font-mono truncate">{activeDrawerLog.id}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveDrawerLog(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4.5 h-4.5" />
               </button>
             </div>
 
-            {/* Body Scroll Area */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs">
+            {/* Scrollable body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
               {/* Status Banner */}
-              <div className="p-3.5 rounded-xl border flex items-center justify-between bg-slate-50/80 border-slate-200">
-                <span className="font-bold text-slate-700">Status Pengiriman</span>
+              <div className="px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 flex items-center justify-between">
+                <span className="font-bold text-slate-600">Status</span>
                 {renderStatusBadge(activeDrawerLog.status)}
               </div>
 
-              {/* Error Message callout if failed */}
+              {/* Error Message callout */}
               {activeDrawerLog.status === "FAILED" && (
                 <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 space-y-2">
                   <div className="flex items-center gap-1.5 font-bold">
@@ -801,115 +894,164 @@ export const NotificationHistoryTab: React.FC = () => {
                     <span>Pesan Gagal Terkirim</span>
                   </div>
                   <p className="text-[11px] text-rose-700 font-mono leading-relaxed">
-                    {activeDrawerLog.errorMessage ||
-                      "Fonnte Provider mengembalikan status error."}
+                    {activeDrawerLog.errorMessage || "Fonnte Provider mengembalikan status error."}
                   </p>
+
                   <button
                     type="button"
                     disabled={isRetrying === activeDrawerLog.id}
                     onClick={() => handleRetrySingle(activeDrawerLog.id)}
-                    className="w-full mt-1 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    className="w-full mt-1 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
                     <RefreshCw
-                      className={`w-3.5 h-3.5 ${
-                        isRetrying === activeDrawerLog.id ? "animate-spin" : ""
-                      }`}
+                      className={`w-3.5 h-3.5 ${isRetrying === activeDrawerLog.id ? "animate-spin" : ""}`}
                     />
                     <span>
-                      {isRetrying === activeDrawerLog.id
-                        ? "Mengirim Ulang..."
-                        : "Coba Kirim Ulang Sekarang"}
+                      {isRetrying === activeDrawerLog.id ? "Mengirim Ulang..." : "Kirim Ulang"}
                     </span>
                   </button>
                 </div>
               )}
 
-              {/* Recipient Details */}
-              <div className="space-y-2 p-4 rounded-xl border border-slate-200/80 bg-white">
+              {/* Recipient Info */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
                 <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Informasi Penerima
+                  Penerima & Kategori
                 </h4>
-                <div className="grid grid-cols-2 gap-3 text-xs pt-1">
+                <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <span className="text-slate-400 block text-[11px]">
-                      Nama Penerima:
-                    </span>
+                    <span className="text-slate-400 block text-[10px] uppercase">Penerima</span>
                     <span className="font-bold text-slate-800">
                       {activeDrawerLog.recipientName || "Pelanggan POS"}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[11px]">
-                      Nomor WhatsApp:
-                    </span>
+                    <span className="text-slate-400 block text-[10px] uppercase">WhatsApp</span>
                     <span className="font-bold text-slate-800 font-mono">
                       {activeDrawerLog.recipientPhone}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[11px]">
-                      Kategori Pesan:
-                    </span>
-                    <span className="font-bold text-emerald-700">
-                      {CATEGORY_LABEL_MAP[activeDrawerLog.category] ||
-                        activeDrawerLog.category}
+                    <span className="text-slate-400 block text-[10px] uppercase">Sumber</span>
+                    <span className="font-bold text-indigo-600">
+                      {getNotificationSource(activeDrawerLog)}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[11px]">
-                      Provider WhatsApp:
-                    </span>
-                    <span className="font-bold text-slate-800 uppercase">
-                      {activeDrawerLog.provider || "Fonnte"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[11px]">
-                      Jumlah Retry:
-                    </span>
+                    <span className="text-slate-400 block text-[10px] uppercase">Kategori</span>
                     <span className="font-bold text-slate-800">
-                      {activeDrawerLog.retryCount} kali
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[11px]">
-                      Waktu Dibuat:
-                    </span>
-                    <span className="font-bold text-slate-800">
-                      {formatExactTime(activeDrawerLog.createdAt)}
+                      {CATEGORY_LABEL_MAP[activeDrawerLog.category] || activeDrawerLog.category}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* WhatsApp Message Preview */}
+              {/* Work Order Info (loaded dynamically) */}
+              {activeDrawerLog.workOrderId && (
+                <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Informasi Work Order
+                  </h4>
+                  {isLoadingWorkOrder ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-5 h-5 text-[#25D366] animate-spin" />
+                    </div>
+                  ) : activeWorkOrder ? (
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase">Kode WO</span>
+                        <span className="font-bold text-slate-800">{activeWorkOrder.code}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase">Status WO</span>
+                        <span className="font-bold text-slate-800">{activeWorkOrder.status}</span>
+                      </div>
+                      {activeWorkOrder.vehicle && (
+                        <div className="col-span-2">
+                          <span className="text-slate-400 block text-[10px] uppercase">Kendaraan</span>
+                          <span className="font-semibold text-slate-800">
+                            {activeWorkOrder.vehicle.brand} {activeWorkOrder.vehicle.model} (
+                            {activeWorkOrder.vehicle.plateNumber})
+                          </span>
+                        </div>
+                      )}
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase">Pelanggan</span>
+                        <span className="font-semibold text-slate-800">
+                          {activeWorkOrder.customer?.name || "Pelanggan"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase">Total</span>
+                        <span className="font-bold text-emerald-600">
+                          Rp {activeWorkOrder.grandTotal.toLocaleString("id-ID")}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-400 italic">
+                      Work Order #{activeDrawerLog.workOrderId} tidak ditemukan.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Message Preview */}
               <div className="space-y-2">
                 <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Isi Pesan WhatsApp Terkirim
+                  Isi Pesan WhatsApp
                 </h4>
-
-                <div className="rounded-2xl border border-slate-300 overflow-hidden bg-[#E5DDD5] shadow-xs">
-                  <div className="bg-[#075E54] text-white px-3.5 py-2 flex items-center gap-2 text-xs font-bold">
+                <div className="rounded-2xl border border-slate-300 overflow-hidden bg-[#E5DDD5] shadow-2xs">
+                  <div className="bg-[#075E54] text-white px-3.5 py-1.5 flex items-center gap-2 text-xs font-bold select-none">
                     <span>POS Bengkel Baik</span>
                   </div>
-
                   <div className="p-3 bg-[radial-[#00000008]_1px,transparent_1px] [background-size:12px_12px]">
-                    <div className="bg-white rounded-lg p-3 text-xs shadow-xs text-slate-800 font-sans leading-relaxed space-y-1.5 border-l-4 border-[#25D366]">
-                      <p className="whitespace-pre-wrap text-[11px]">
+                    <div className="bg-white rounded-lg p-3 shadow-2xs text-slate-800 leading-relaxed space-y-1.5 border-l-4 border-[#25D366]">
+                      <p className="whitespace-pre-wrap text-[11px] font-medium">
                         {activeDrawerLog.message}
                       </p>
-                      <div className="flex items-center justify-end gap-1 text-[9px] text-slate-400 pt-1">
-                        <span>
-                          {formatExactTime(
-                            activeDrawerLog.sentAt || activeDrawerLog.createdAt
-                          )}
-                        </span>
+                      <div className="flex items-center justify-end gap-1 text-[9px] text-slate-400 pt-1 select-none">
+                        <span>{formatExactTime(activeDrawerLog.sentAt || activeDrawerLog.createdAt)}</span>
                         <CheckCheck className="w-3.5 h-3.5 text-[#34B7F1]" />
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* Technical Details Collapsible */}
+              <details className="group border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
+                <summary className="flex items-center justify-between p-3.5 text-[11px] font-bold text-slate-600 cursor-pointer select-none hover:bg-slate-100/50 transition-colors">
+                  <span>Detail Teknis / Metadata</span>
+                  <span className="text-slate-400 transition-transform duration-200 group-open:rotate-180">
+                    ▼
+                  </span>
+                </summary>
+                <div className="p-3.5 border-t border-slate-200 space-y-2.5 font-mono text-[10px] text-slate-500 bg-white">
+                  <div>
+                    <span className="text-slate-400 block text-[9px] uppercase">Message ID</span>
+                    <span className="font-semibold text-slate-700">{activeDrawerLog.providerMessageId || "-"}</span>
+                  </div>
+                  {activeDrawerLog.trigger && (
+                    <div>
+                      <span className="text-slate-400 block text-[9px] uppercase">Trigger</span>
+                      <span className="font-semibold text-slate-700">{activeDrawerLog.trigger}</span>
+                    </div>
+                  )}
+                  {activeDrawerLog.automationId && (
+                    <div>
+                      <span className="text-slate-400 block text-[9px] uppercase">Automation ID</span>
+                      <span className="font-semibold text-slate-700">{activeDrawerLog.automationId}</span>
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-slate-400 block text-[9px] uppercase">Response Provider</span>
+                    <pre className="mt-1 p-2 rounded bg-slate-50 overflow-x-auto max-h-36 custom-scrollbar text-[9px] text-slate-600 border border-slate-150">
+                      {JSON.stringify(activeDrawerLog.providerResponse, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              </details>
             </div>
           </div>
         </div>
