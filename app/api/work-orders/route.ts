@@ -483,6 +483,16 @@ export async function POST(request: Request) {
       userAgent,
     });
 
+    // Trigger WORK_ORDER_CREATED automation safely in DRY_RUN mode
+    const { NotificationAutomationEngineService } = await import("@/lib/notifications/notification-automation-engine.service");
+    const { NotificationTrigger } = await import("@prisma/client");
+    NotificationAutomationEngineService.executeForWorkOrder(
+      NotificationTrigger.WORK_ORDER_CREATED,
+      workOrder.id
+    ).catch((err) => {
+      console.error("Error executing WORK_ORDER_CREATED automation:", err);
+    });
+
     return success(cleanedWorkOrder, 201);
   } catch (err: any) {
     if (err instanceof ForbiddenError) {

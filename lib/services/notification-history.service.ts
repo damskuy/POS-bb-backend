@@ -3,6 +3,7 @@ import {
   NotificationChannel,
   NotificationStatus,
   NotificationCategory,
+  NotificationTrigger,
   Prisma,
 } from "@prisma/client";
 import { defaultNotificationService } from "@/lib/notifications/notification.service";
@@ -15,6 +16,10 @@ export interface CreateHistoryInput {
   message: string;
   status?: NotificationStatus;
   provider?: string;
+  automationId?: number | null;
+  workOrderId?: number | null;
+  trigger?: NotificationTrigger | null;
+  providerResponse?: any;
 }
 
 export interface GetHistoryQuery {
@@ -41,6 +46,10 @@ export class NotificationHistoryService {
         message: input.message,
         status: input.status || NotificationStatus.PENDING,
         provider: input.provider || "fonnte",
+        automationId: input.automationId || null,
+        workOrderId: input.workOrderId || null,
+        trigger: input.trigger || null,
+        providerResponse: input.providerResponse ? input.providerResponse : Prisma.JsonNull,
       },
     });
   }
@@ -230,6 +239,10 @@ export class NotificationHistoryService {
 
     if (!existing) {
       throw new Error("Log notifikasi tidak ditemukan");
+    }
+
+    if (existing.status === NotificationStatus.SIMULATED) {
+      throw new Error("Notifikasi simulasi tidak dapat dikirim ulang");
     }
 
     if (existing.status !== NotificationStatus.FAILED) {

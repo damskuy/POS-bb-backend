@@ -6,6 +6,7 @@ import { seedVehicles } from "./seed/vehicles";
 import { seedServices } from "./seed/services";
 import { seedSpareParts } from "./seed/spareparts";
 import { seedWorkOrders } from "./seed/workorders";
+import { seedNotificationAutomations } from "./seed/automations";
 
 const prisma = new PrismaClient();
 
@@ -27,6 +28,8 @@ async function main() {
     spareparts,
     users,
   });
+
+  await seedNotificationAutomations(prisma);
 
   console.log("Database seeding completed successfully!");
 }

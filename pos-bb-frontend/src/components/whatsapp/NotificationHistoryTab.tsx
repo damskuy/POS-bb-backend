@@ -13,7 +13,6 @@ import {
   X,
   Copy,
   CheckCheck,
-  RotateCcw,
   Trash2,
   Check,
   Car,
@@ -140,20 +139,7 @@ export const NotificationHistoryTab: React.FC = () => {
     setPage(1);
   };
 
-  // Reset Filters
-  const isFiltered =
-    search.trim() !== "" ||
-    dateFilter !== "all" ||
-    categoryFilter !== "Semua kategori" ||
-    statusFilter !== "all";
 
-  const resetFilters = () => {
-    setSearch("");
-    setDateFilter("all");
-    setCategoryFilter("Semua kategori");
-    setStatusFilter("all");
-    setPage(1);
-  };
 
   // Single Retry Action
   const handleRetrySingle = async (id: string) => {
@@ -265,6 +251,13 @@ export const NotificationHistoryTab: React.FC = () => {
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80">
             <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
             <span>{status === "PROCESSING" ? "Diproses" : "Pending"}</span>
+          </span>
+        );
+      case "SIMULATED":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200/80">
+            <Info className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+            <span>Simulasi</span>
           </span>
         );
       case "FAILED":
@@ -451,17 +444,6 @@ export const NotificationHistoryTab: React.FC = () => {
               ))}
             </div>
 
-            {/* Reset Filter Button */}
-            {isFiltered && (
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors flex items-center gap-1"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset Filter</span>
-              </button>
-            )}
           </div>
         </div>
       </div>

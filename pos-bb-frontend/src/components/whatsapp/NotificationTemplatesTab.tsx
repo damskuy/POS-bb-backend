@@ -27,6 +27,7 @@ import {
   NotificationCategory,
 } from "../../types/notificationTemplate";
 import { NotificationTemplateService } from "@/services/notificationTemplate.service";
+import { CustomerService } from "@/services/customer.service";
 
 const CATEGORY_DISPLAY_MAP: Record<string, string> = {
   WORK_ORDER_CREATED: "Pekerjaan Masuk",
@@ -67,6 +68,87 @@ export const NotificationTemplatesTab: React.FC = () => {
   const [templateToDelete, setTemplateToDelete] =
     useState<NotificationTemplate | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Broadcast Action States
+  const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
+  const [broadcastNotice, setBroadcastNotice] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  const handleSendBroadcast = async () => {
+    if (!activeTemplate) return;
+    setIsSendingBroadcast(true);
+    setBroadcastNotice(null);
+
+    try {
+      const { data: customers } = await CustomerService.getCustomers({ limit: 100 });
+      const targetSeg =
+        activeTemplate.conditions?.targetSegment ||
+        activeTemplate.targetRecipients?.[0] ||
+        "all_customers";
+
+      if (!customers || customers.length === 0) {
+        const res = await NotificationTemplateService.sendTemplate(activeTemplate.id, {
+          recipientName: `Pelanggan (${targetSeg})`,
+        });
+        setBroadcastNotice({
+          type: "success",
+          message: `Broadcast berhasil dikirim! (${res.recipientName} - ${res.recipientPhone})`,
+        });
+        return;
+      }
+
+      const validCustomers = customers.filter((c) => c.phone && c.phone.trim() !== "");
+
+      if (validCustomers.length === 0) {
+        setBroadcastNotice({
+          type: "error",
+          message: "Tidak ada pelanggan dengan nomor WhatsApp valid untuk target ini.",
+        });
+        return;
+      }
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const cust of validCustomers) {
+        try {
+          await NotificationTemplateService.sendTemplate(activeTemplate.id, {
+            customerId: cust.id,
+            phone: cust.phone,
+            recipientName: cust.name,
+          });
+          successCount++;
+        } catch (err) {
+          console.error("Failed to send broadcast to customer:", cust.id, err);
+          failCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        setBroadcastNotice({
+          type: "success",
+          message: `Broadcast berhasil dikirim ke ${successCount} pelanggan!${
+            failCount > 0 ? ` (${failCount} gagal)` : ""
+          }`,
+        });
+      } else {
+        setBroadcastNotice({
+          type: "error",
+          message: "Gagal mengirim pesan broadcast. Periksa koneksi Fonnte Provider Anda.",
+        });
+      }
+    } catch (err: any) {
+      console.error("Error sending broadcast:", err);
+      setBroadcastNotice({
+        type: "error",
+        message: err.message || "Gagal mengirim broadcast.",
+      });
+    } finally {
+      setIsSendingBroadcast(false);
+    }
+  };
 
   // Fetch Templates from Backend API
   const loadTemplates = useCallback(async () => {
@@ -774,6 +856,59 @@ export const NotificationTemplatesTab: React.FC = () => {
                       </span>
                     </button>
                   </div>
+
+                  {/* Options Kirim Langsung (Button Kirim Broadcast) */}
+                  {activeTemplate.deliveryTiming === "direct" && (
+                    <div className="p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200/80 space-y-3 animate-fadeIn">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 font-sans">
+                            <Zap className="w-4 h-4 text-emerald-600" />
+                            Eksekusi Broadcast Langsung
+                          </h5>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Pesan akan langsung dikirimkan via WhatsApp Fonnte ke target pelanggan yang ditentukan.
+                          </p>
+                        </div>
+                      </div>
+
+                      {broadcastNotice && (
+                        <div
+                          className={`p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${
+                            broadcastNotice.type === "success"
+                              ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                              : "bg-rose-100 text-rose-800 border border-rose-300"
+                          }`}
+                        >
+                          {broadcastNotice.type === "success" ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                          )}
+                          <span>{broadcastNotice.message}</span>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={isSendingBroadcast}
+                        onClick={handleSendBroadcast}
+                        className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold bg-[#25D366] hover:bg-[#1eb956] text-white shadow-xs hover:shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        {isSendingBroadcast ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Mengirim Broadcast...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Kirim Broadcast Sekarang</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
 
                   {/* Options Terjadwal */}
                   {activeTemplate.deliveryTiming === "scheduled" && (

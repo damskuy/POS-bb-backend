@@ -8,16 +8,16 @@ datasource db {
 }
 
 model Customer {
-  id        Int       @id @default(autoincrement())
-  name      String
-  phone     String    @unique
-  address   String?
-  notes     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-  vehicles  Vehicle[]
-  workOrders  WorkOrder[]
+  id         Int         @id @default(autoincrement())
+  name       String
+  phone      String      @unique
+  address    String?
+  notes      String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  deletedAt  DateTime?
+  vehicles   Vehicle[]
+  workOrders WorkOrder[]
 
   @@map("customers")
 }
@@ -34,20 +34,21 @@ model Vehicle {
   updatedAt    DateTime     @updatedAt
   deletedAt    DateTime?
   customer     Customer     @relation(fields: [customerId], references: [id])
-  workOrders WorkOrder[]
+  workOrders   WorkOrder[]
+
   @@map("vehicles")
 }
 
 model Mechanic {
-  id          Int         @id @default(autoincrement())
-  name        String
-  phone       String
-  address     String?
-  workOrders  WorkOrder[]
+  id         Int         @id @default(autoincrement())
+  name       String
+  phone      String
+  address    String?
+  workOrders WorkOrder[]
 
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  deletedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@map("mechanics")
 }
@@ -118,7 +119,7 @@ model SparePart {
 model ServicePackage {
   id          Int                  @id @default(autoincrement())
   name        String
-  unitPrice       Int                  @default(0)
+  unitPrice   Int                  @default(0)
   description String?
   createdAt   DateTime             @default(now())
   updatedAt   DateTime             @updatedAt
@@ -145,16 +146,16 @@ model ServicePackageItem {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  name      String
-  email     String   @unique
-  password  String
+  name     String
+  email    String @unique
+  password String
 
-  role      UserRole @default(CASHIER)
+  role UserRole @default(CASHIER)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   workOrders WorkOrder[]
@@ -164,130 +165,130 @@ model User {
 }
 
 model WorkOrder {
-  id           Int                 @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  code         String              @unique
+  code String @unique
 
-  customerId   Int
-  customer     Customer            @relation(fields: [customerId], references: [id])
+  customerId Int
+  customer   Customer @relation(fields: [customerId], references: [id])
 
-  vehicleId    Int
-  vehicle      Vehicle             @relation(fields: [vehicleId], references: [id])
+  vehicleId Int
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
 
-  mechanicId   Int?
-  mechanic     Mechanic?           @relation(fields: [mechanicId], references: [id])
+  mechanicId Int?
+  mechanic   Mechanic? @relation(fields: [mechanicId], references: [id])
 
-  userId       Int?
-  user         User?               @relation(fields: [userId], references: [id])
+  userId Int?
+  user   User? @relation(fields: [userId], references: [id])
 
-  status       WorkOrderStatus     @default(PENDING)
+  status WorkOrderStatus @default(PENDING)
 
-  complaint    String?
-  odometer     Int?
-  notes        String?
+  complaint String?
+  odometer  Int?
+  notes     String?
 
-  subtotal     Int                 @default(0)
-  discount     Int                 @default(0)
-  tax          Int                 @default(0)
-  grandTotal   Int                 @default(0)
+  subtotal   Int @default(0)
+  discount   Int @default(0)
+  tax        Int @default(0)
+  grandTotal Int @default(0)
 
-  checkInAt    DateTime?
-  finishedAt   DateTime?
+  checkInAt  DateTime?
+  finishedAt DateTime?
 
-  services     WorkOrderService[]
-  parts        WorkOrderPart[]
+  services WorkOrderService[]
+  parts    WorkOrderPart[]
 
-  payment      Payment?
-  invoice      Invoice?
+  payment Payment?
+  invoice Invoice?
 
   scheduleDate DateTime?
 
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-  deletedAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@map("work_orders")
 }
 
 model WorkOrderService {
-  id            Int         @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  workOrderId   Int
-  workOrder     WorkOrder   @relation(fields: [workOrderId], references: [id])
+  workOrderId Int
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
 
-  serviceId     Int
-  service        Service     @relation(fields: [serviceId], references: [id])
+  serviceId Int
+  service   Service @relation(fields: [serviceId], references: [id])
 
-  price         Int
-  quantity      Int          @default(1)
-  subtotal      Int
+  price    Int
+  quantity Int @default(1)
+  subtotal Int
 
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  deletedAt     DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@map("work_order_services")
 }
 
 model WorkOrderPart {
-  id            Int         @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  workOrderId   Int
-  workOrder     WorkOrder   @relation(fields: [workOrderId], references: [id])
+  workOrderId Int
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
 
-  sparePartId   Int
-  sparePart     SparePart   @relation(fields: [sparePartId], references: [id])
+  sparePartId Int
+  sparePart   SparePart @relation(fields: [sparePartId], references: [id])
 
-  price         Int
-  quantity      Int         @default(1)
-  subtotal      Int
+  price    Int
+  quantity Int @default(1)
+  subtotal Int
 
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  deletedAt     DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@map("work_order_parts")
 }
 
 model Payment {
-  id                 Int              @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  workOrderId        Int              @unique
-  workOrder          WorkOrder        @relation(fields: [workOrderId], references: [id])
+  workOrderId Int       @unique
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
 
-  method             PaymentMethod
+  method PaymentMethod
 
-  amount             Int
+  amount Int
 
-  status             PaymentStatus    @default(UNPAID)
+  status PaymentStatus @default(UNPAID)
 
-  referenceNumber    String?
+  referenceNumber String?
 
-  paidAt             DateTime?
+  paidAt DateTime?
 
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-  deletedAt          DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@map("payments")
 }
 
 model Invoice {
-  id               Int         @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  invoiceNumber    String      @unique
+  invoiceNumber String @unique
 
-  workOrderId      Int         @unique
-  workOrder        WorkOrder   @relation(fields: [workOrderId], references: [id])
+  workOrderId Int       @unique
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
 
-  printedAt        DateTime?
+  printedAt DateTime?
 
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  status           String?     @default("DRAFT")
-  issuedAt         DateTime?   @default(now())
-  deletedAt        DateTime?
+  status    String?   @default("DRAFT")
+  issuedAt  DateTime? @default(now())
+  deletedAt DateTime?
 
   @@map("invoices")
 }
@@ -323,22 +324,22 @@ enum ReminderCategory {
 }
 
 model ReminderRule {
-  id              Int                  @id @default(autoincrement())
+  id              Int                 @id @default(autoincrement())
   name            String
   description     String?
-  category        ReminderCategory     @default(SERVIS)
-  triggerType     ReminderTriggerType  @default(DAYS)
+  category        ReminderCategory    @default(SERVIS)
+  triggerType     ReminderTriggerType @default(DAYS)
   daysInterval    Int?
   kmInterval      Int?
   messageTemplate String
-  sendTime        String               @default("09:00")
-  timezone        String               @default("Asia/Jakarta")
-  sendDays        String               @default("Senin - Sabtu")
-  skipHolidays    Boolean              @default(true)
-  retryOnFailure  Boolean              @default(true)
-  isActive        Boolean              @default(true)
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  sendTime        String              @default("09:00")
+  timezone        String              @default("Asia/Jakarta")
+  sendDays        String              @default("Senin - Sabtu")
+  skipHolidays    Boolean             @default(true)
+  retryOnFailure  Boolean             @default(true)
+  isActive        Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
   deletedAt       DateTime?
 
   @@map("reminder_rules")
@@ -365,6 +366,7 @@ enum NotificationChannel {
 enum NotificationStatus {
   PENDING
   PROCESSING
+  SIMULATED
   SENT
   DELIVERED
   FAILED
@@ -385,33 +387,61 @@ model NotificationTemplate {
   updatedAt        DateTime             @updatedAt
   deletedAt        DateTime?
 
+  automations NotificationAutomation[]
+
   @@map("notification_templates")
 }
 
-model NotificationHistory {
-  id                String               @id @default(cuid())
-  recipientName     String?
-  recipientPhone    String
-  channel           NotificationChannel  @default(WHATSAPP)
-  category          NotificationCategory
-  message           String
-  status            NotificationStatus   @default(PENDING)
+enum NotificationTrigger {
+  WORK_ORDER_CREATED
+  WORK_ORDER_IN_PROGRESS
+  WORK_ORDER_COMPLETED
+}
 
-  provider          String?              @default("fonnte")
+model NotificationAutomation {
+  id          Int                   @id @default(autoincrement())
+  name        String
+  description String?
+  trigger     NotificationTrigger   @unique
+  isEnabled   Boolean               @default(true)
+  templateId  Int?
+  template    NotificationTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([isEnabled])
+  @@map("notification_automations")
+}
+
+model NotificationHistory {
+  id             String               @id @default(cuid())
+  recipientName  String?
+  recipientPhone String
+  channel        NotificationChannel  @default(WHATSAPP)
+  category       NotificationCategory
+  message        String
+  status         NotificationStatus   @default(PENDING)
+
+  provider          String? @default("fonnte")
   providerMessageId String?
   providerResponse  Json?
   errorMessage      String?
 
-  retryCount        Int                  @default(0)
+  retryCount Int @default(0)
 
-  sentAt            DateTime?
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
+  automationId Int?
+  workOrderId  Int?
+  trigger      NotificationTrigger?
+
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([status])
   @@index([category])
   @@index([recipientPhone])
   @@index([createdAt])
+  @@index([workOrderId, trigger, automationId])
   @@map("notification_history")
 }
 
@@ -437,6 +467,3 @@ model JobExecutionLog {
   @@index([startedAt])
   @@map("job_execution_logs")
 }
-
-
-

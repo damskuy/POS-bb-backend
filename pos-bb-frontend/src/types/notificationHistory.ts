@@ -3,6 +3,7 @@ export type NotificationChannel = "WHATSAPP";
 export type NotificationStatus =
   | "PENDING"
   | "PROCESSING"
+  | "SIMULATED"
   | "SENT"
   | "DELIVERED"
   | "FAILED";

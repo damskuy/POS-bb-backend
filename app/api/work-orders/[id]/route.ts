@@ -465,8 +465,28 @@ export async function PATCH(
       userAgent,
     });
 
-    // Trigger automatic WORK_ORDER_COMPLETED WhatsApp notification if status changed to COMPLETED
+    // Trigger Phase 2A Automation Engine safely in DRY_RUN mode for status transitions
+    const { NotificationAutomationEngineService } = await import("@/lib/notifications/notification-automation-engine.service");
+    const { NotificationTrigger } = await import("@prisma/client");
+
+    if (existing.status !== "IN_PROGRESS" && cleanedWorkOrder.status === "IN_PROGRESS") {
+      NotificationAutomationEngineService.executeForWorkOrder(
+        NotificationTrigger.WORK_ORDER_IN_PROGRESS,
+        existing.id
+      ).catch((err) => {
+        console.error("Error executing WORK_ORDER_IN_PROGRESS automation:", err);
+      });
+    }
+
     if (existing.status !== "COMPLETED" && cleanedWorkOrder.status === "COMPLETED") {
+      NotificationAutomationEngineService.executeForWorkOrder(
+        NotificationTrigger.WORK_ORDER_COMPLETED,
+        existing.id
+      ).catch((err) => {
+        console.error("Error executing WORK_ORDER_COMPLETED automation:", err);
+      });
+
+      // Existing direct WhatsApp trigger (legacy)
       const { AutoNotificationService } = await import("@/lib/notifications/auto-notification.service");
       AutoNotificationService.triggerWorkOrderCompleted(existing.id).catch((err) => {
         console.error("Error triggering completed notification:", err);
