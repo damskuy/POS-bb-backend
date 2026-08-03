@@ -129,25 +129,64 @@ export class GenericLlmAiInsightProvider implements AiInsightProvider {
 
     const promptText = buildAiPrompt(data);
 
-    // Dynamic import / fetch adapter if API key present
-    // For safety, parse and validate returned response with normalizeAiOutput
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     try {
-      // Fetch implementation for Gemini API
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.modelName}:generateContent?key=${this.apiKey}`;
+      let url = "";
+      let headers: Record<string, string> = { "Content-Type": "application/json" };
+      let bodyData: any = {};
+
+      const isOpenAi = this.name.toLowerCase() === "openai";
+
+      if (isOpenAi) {
+        url = "https://api.openai.com/v1/chat/completions";
+        headers["Authorization"] = `Bearer ${this.apiKey}`;
+        bodyData = {
+          model: this.modelName || "gpt-4o-mini",
+          messages: [
+            { role: "system", content: SYSTEM_INSTRUCTION },
+            { role: "user", content: promptText },
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.2,
+        };
+      } else {
+        // Default: Gemini API
+        const model = this.modelName || "gemini-1.5-flash";
+        url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
+        bodyData = {
+          contents: [{ parts: [{ text: promptText }] }],
+        };
+      }
+
       const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText }] }],
-        }),
+        headers,
+        body: JSON.stringify(bodyData),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
       if (!res.ok) {
+        if (res.status === 429) {
+          throw new Error("AI Provider rate limit exceeded (HTTP 429)");
+        }
+        if (res.status === 401 || res.status === 403) {
+          throw new Error(`AI Provider authentication failed (HTTP ${res.status})`);
+        }
         throw new Error(`AI Provider returned HTTP ${res.status}`);
       }
 
       const resJson = await res.json();
-      const rawText = resJson?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      let rawText = "";
+
+      if (isOpenAi) {
+        rawText = resJson?.choices?.[0]?.message?.content || "";
+      } else {
+        rawText = resJson?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      }
 
       // Clean markdown fenced code block if present
       const cleanedJsonText = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
@@ -155,11 +194,15 @@ export class GenericLlmAiInsightProvider implements AiInsightProvider {
 
       const normalized = normalizeAiOutput(parsedObj);
       if (!normalized) {
-        throw new Error("AI output failed Zod schema validation");
+        throw new Error("AI provider returned invalid output schema");
       }
 
       return normalized;
     } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === "AbortError") {
+        throw new Error("AI Provider request timed out (8s limit)");
+      }
       throw new Error(`AI Provider execution failed: ${err.message}`);
     }
   }

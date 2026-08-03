@@ -164,14 +164,16 @@ export function generateDeterministicFallback(data: AiInsightDataReport): AiInsi
     summaryText = `Kinerja bisnis bengkel pada ${period.label} relatif stabil dengan total pendapatan Rp ${revenue.current.toLocaleString("id-ID")}. Pertahankan kualitas operasional dan kelengkapan stok barang.`;
   }
 
+  const isLimited = workOrders.current > 0 && workOrders.current < 3;
+
   return {
     summary: summaryText,
     highlights,
     recommendation,
-    confidence: "HIGH",
+    confidence: isLimited ? "MEDIUM" : "HIGH",
     dataQuality: {
-      status: "SUFFICIENT",
-      note: null,
+      status: isLimited ? "LIMITED" : "SUFFICIENT",
+      note: isLimited ? "Data transaksi pada rentang tanggal ini masih terbatas." : null,
     },
   };
 }

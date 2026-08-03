@@ -70,11 +70,12 @@ export const AiBusinessInsightCard: React.FC<AiBusinessInsightCardProps> = ({
       if (filters.startDate) params.startDate = filters.startDate;
       if (filters.endDate) params.endDate = filters.endDate;
 
-      const res = await api.get<AiInsightResponseData>("/api/reports/ai-insight", {
+      const res = await api.get<any>("/api/reports/ai-insight", {
         params,
       });
 
-      setData(res);
+      const insightData = res?.data || res;
+      setData(insightData);
     } catch (err: any) {
       console.error("[AiBusinessInsightCard] Failed to fetch insight:", err);
       setError(err.message || "Gagal memuat analisis bisnis AI");
@@ -113,7 +114,7 @@ export const AiBusinessInsightCard: React.FC<AiBusinessInsightCardProps> = ({
     return (
       <div className="border border-rose-200/80 bg-rose-50/40 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center space-x-3">
-          <div className="p-2 bg-rose-100 text-rose-600 rounded-xl">
+          <div className="p-2 bg-rose-100 text-rose-600 rounded-xl shrink-0">
             <AlertTriangle className="h-5 w-5" />
           </div>
           <div>
@@ -123,18 +124,40 @@ export const AiBusinessInsightCard: React.FC<AiBusinessInsightCardProps> = ({
         </div>
         <button
           onClick={fetchInsight}
-          className="inline-flex items-center space-x-2 px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium rounded-lg shadow-xs transition-colors cursor-pointer"
+          className="inline-flex items-center space-x-2 px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium rounded-lg shadow-xs transition-colors shrink-0 cursor-pointer"
         >
-          <RefreshCw className="h-3.5 w-3.5 animate-spin-hover" />
+          <RefreshCw className="h-3.5 w-3.5" />
           <span>Coba Lagi</span>
         </button>
       </div>
     );
   }
 
-  if (!data) return null;
+  // Render Empty State if data is missing or empty
+  if (!data || (!data.summary && (!data.highlights || data.highlights.length === 0))) {
+    return (
+      <div className="border border-slate-200/80 bg-slate-50/50 rounded-2xl p-6 shadow-xs flex flex-col items-center justify-center text-center space-y-3">
+        <div className="p-3 bg-slate-100 text-slate-500 rounded-full">
+          <Info className="h-5 w-5" />
+        </div>
+        <div>
+          <h4 className="text-sm font-semibold text-slate-800">Belum Ada Analisis AI</h4>
+          <p className="text-xs text-slate-500 max-w-md mt-1">
+            Data transaksi atau laporan bisnis belum cukup untuk menghasilkan analisis bisnis AI pada rentang tanggal ini.
+          </p>
+        </div>
+        <button
+          onClick={fetchInsight}
+          className="inline-flex items-center space-x-2 px-3.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-lg shadow-xs transition-colors cursor-pointer"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          <span>Muat Ulang Data</span>
+        </button>
+      </div>
+    );
+  }
 
-  const isInsufficient = data.dataQuality?.status === "INSUFFICIENT";
+  const isInsufficient = data.dataQuality?.status === "INSUFFICIENT" || data.dataQuality?.status === "LIMITED";
 
   // Helper for Highlight Badge styles
   const getHighlightBadge = (type: AiHighlightItem["type"]) => {
@@ -225,7 +248,7 @@ export const AiBusinessInsightCard: React.FC<AiBusinessInsightCardProps> = ({
         <div className="flex items-start space-x-3 p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs">
           <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
           <span>
-            Data transaksi pada rentang tanggal ini masih terbatas. Tambahkan Work Order dan pembayaran baru untuk memperoleh rekomendasi bisnis yang lebih akurat.
+            {data.dataQuality?.note || "Data transaksi pada rentang tanggal ini masih terbatas. Tambahkan Work Order dan pembayaran baru untuk memperoleh rekomendasi bisnis yang lebih akurat."}
           </span>
         </div>
       )}
