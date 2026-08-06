@@ -17,6 +17,26 @@ export const HighlightSchema = z.object({
   metric: HighlightMetricSchema,
 });
 
+export const PriorityImpactSchema = z.enum(["HIGH", "MEDIUM", "LOW"]);
+
+export const PriorityActionWhySchema = z.object({
+  summary: z.string().min(1),
+  evidence: z.array(z.string()),
+});
+
+export const PriorityActionItemSchema = z.object({
+  priority: z.number().int().min(1),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  impact: PriorityImpactSchema,
+  estimatedRevenue: z.number().optional(),
+  estimatedSaving: z.number().optional(),
+  reason: z.string().min(1),
+  actionLabel: z.string().min(1),
+  actionTarget: z.string().nullable().optional(),
+  why: PriorityActionWhySchema.optional(),
+});
+
 export const RecommendationSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
@@ -24,10 +44,24 @@ export const RecommendationSchema = z.object({
   actionTarget: z.string().nullable().optional(),
 });
 
+export const ExplanationEvidenceSchema = z.object({
+  label: z.string().min(1),
+  value: z.string().min(1),
+  interpretation: z.string().min(1),
+});
+
+export const ExplanationSchema = z.object({
+  title: z.string().min(1),
+  summary: z.string().min(1),
+  evidence: z.array(ExplanationEvidenceSchema).max(5),
+});
+
 export const AiInsightOutputSchema = z.object({
   summary: z.string().min(1),
   highlights: z.array(HighlightSchema).min(1).max(3),
   recommendation: RecommendationSchema,
+  priorityActions: z.array(PriorityActionItemSchema).max(3).optional(),
+  explanation: ExplanationSchema.optional(),
   confidence: z.enum(["HIGH", "MEDIUM", "LOW"]),
   dataQuality: z.object({
     status: z.enum(["SUFFICIENT", "LIMITED", "INSUFFICIENT"]),
@@ -35,6 +69,8 @@ export const AiInsightOutputSchema = z.object({
   }),
 });
 
+export type PriorityActionItem = z.infer<typeof PriorityActionItemSchema>;
+export type ExplanationData = z.infer<typeof ExplanationSchema>;
 export type AiInsightOutput = z.infer<typeof AiInsightOutputSchema>;
 
 const ALLOWED_ACTION_TARGETS = new Set([
@@ -47,6 +83,7 @@ const ALLOWED_ACTION_TARGETS = new Set([
   "/spare-parts",
   "/invoices",
   "/dashboard",
+  "/settings",
 ]);
 
 /**
@@ -79,10 +116,27 @@ export function validateActionTarget(target?: string | null): string | null {
 
 /**
  * Normalizes and validates the raw AI output object.
- * Ensures max 3 highlights, validates actionTarget, and enforces Zod compliance.
+ * Ensures max 3 highlights, max 3 priorityActions, max 5 explanation evidence items, validates actionTarget, and enforces Zod compliance.
  */
 export function normalizeAiOutput(rawOutput: any): AiInsightOutput | null {
   try {
+    if (rawOutput && typeof rawOutput === "object") {
+      let modified = { ...rawOutput };
+      if (Array.isArray(modified.highlights)) {
+        modified.highlights = modified.highlights.slice(0, 3);
+      }
+      if (Array.isArray(modified.priorityActions)) {
+        modified.priorityActions = modified.priorityActions.slice(0, 3);
+      }
+      if (modified.explanation && Array.isArray(modified.explanation.evidence)) {
+        modified.explanation = {
+          ...modified.explanation,
+          evidence: modified.explanation.evidence.slice(0, 5),
+        };
+      }
+      rawOutput = modified;
+    }
+
     const parsed = AiInsightOutputSchema.parse(rawOutput);
 
     // Limit highlights to max 3
@@ -96,10 +150,31 @@ export function normalizeAiOutput(rawOutput: any): AiInsightOutput | null {
       actionLabel: safeTarget ? parsed.recommendation.actionLabel || "Buka Halaman" : null,
     };
 
+    // Normalize priorityActions (max 3, reassign priority numbers 1..N, sanitize actionTarget)
+    const priorityActions = (parsed.priorityActions || []).slice(0, 3).map((act, index) => {
+      const target = validateActionTarget(act.actionTarget);
+      return {
+        ...act,
+        priority: index + 1,
+        actionTarget: target,
+        actionLabel: target ? act.actionLabel || "Lihat Details" : act.actionLabel,
+      };
+    });
+
+    // Normalize explanation evidence (max 5)
+    const explanation = parsed.explanation
+      ? {
+          ...parsed.explanation,
+          evidence: parsed.explanation.evidence.slice(0, 5),
+        }
+      : undefined;
+
     return {
       ...parsed,
       highlights,
       recommendation,
+      priorityActions,
+      explanation,
     };
   } catch (err) {
     return null;

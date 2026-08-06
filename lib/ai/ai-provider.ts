@@ -16,7 +16,9 @@ ATURAN KETAT:
 4. Gunakan Bahasa Indonesia yang ringkas, jelas, profesional, dan mudah dipahami pemilik bengkel (maksimal 2 kalimat untuk summary).
 5. Highlights terdiri dari 1 hingga 3 item utama (tipe: positive, warning, atau opportunity).
 6. Berikan tepat 1 rekomendasi utama yang konkret dan relevan.
-7. Output HARUS dalam bentuk objek JSON murni tanpa pembungkus markdown (tanpa \`\`\`json).`;
+7. Hasilkan 1 hingga 3 tindakan prioritas (priorityActions) yang diurutkan berdasarkan dampak bisnis terpenting (HIGH -> MEDIUM -> LOW). Setiap tindakan prioritas wajib menyertakan atribut "why" (berisi summary dan bukti evidence).
+8. Sediakan penjelasan "explanation" (title, summary, dan maksimal 5 evidence: label, value, interpretation) yang menjelaskan mengapa AI memilih rekomendasi & prioritas tersebut berdasarkan metrik bisnis aktual.
+9. Output HARUS dalam bentuk objek JSON murni tanpa pembungkus markdown (tanpa \`\`\`json).`;
 
 /**
  * Build safe JSON prompt from aggregated report metrics.
@@ -52,7 +54,37 @@ Hasilkan JSON sesuai skema berikut:
     "title": "...",
     "description": "...",
     "actionLabel": "...",
-    "actionTarget": "/reports | /customers | /inventory | /whatsapp | /work-orders"
+    "actionTarget": "/reports | /customers | /inventory | /whatsapp | /work-orders | /settings"
+  },
+  "priorityActions": [
+    {
+      "priority": 1,
+      "title": "...",
+      "description": "...",
+      "impact": "HIGH | MEDIUM | LOW",
+      "estimatedRevenue": 1000000,
+      "estimatedSaving": 0,
+      "reason": "...",
+      "actionLabel": "...",
+      "actionTarget": "/customers | /inventory | /reports | /work-orders | /whatsapp | /settings",
+      "why": {
+        "summary": "...",
+        "evidence": [
+          "..."
+        ]
+      }
+    }
+  ],
+  "explanation": {
+    "title": "Mengapa AI memberikan rekomendasi ini?",
+    "summary": "...",
+    "evidence": [
+      {
+        "label": "...",
+        "value": "...",
+        "interpretation": "..."
+      }
+    ]
   },
   "confidence": "HIGH | MEDIUM | LOW",
   "dataQuality": {
@@ -99,6 +131,32 @@ export class MockAiInsightProvider implements AiInsightProvider {
         actionLabel: "Buka Reports",
         actionTarget: "/reports",
       },
+      priorityActions: [
+        {
+          priority: 1,
+          title: "Aksi Prioritas Mock",
+          description: "Pantau pengerjaan Work Order aktif.",
+          impact: "HIGH",
+          reason: "Tingkatkan kepuasan pelanggan.",
+          actionLabel: "Lihat Work Orders",
+          actionTarget: "/work-orders",
+          why: {
+            summary: "Work order aktif menentukan kepuasan servis.",
+            evidence: ["5 work order completed"],
+          },
+        },
+      ],
+      explanation: {
+        title: "Mengapa AI memberikan rekomendasi ini?",
+        summary: "Analisis metrik menunjukkan kinerja operasional stabil.",
+        evidence: [
+          {
+            label: "Work Orders",
+            value: "5",
+            interpretation: "Aktivitas pengerjaan berjalan lancar.",
+          },
+        ],
+      },
       confidence: "HIGH",
       dataQuality: {
         status: "SUFFICIENT",
@@ -119,7 +177,7 @@ export class GenericLlmAiInsightProvider implements AiInsightProvider {
   constructor(name: string, apiKey: string, modelName: string) {
     this.name = name;
     this.apiKey = apiKey;
-    this.modelName = modelName || "gemini-1.5-flash";
+    this.modelName = modelName || "gemini-3.6-flash";
   }
 
   async generateBusinessInsight(data: AiInsightDataReport): Promise<AiInsightOutput> {
@@ -130,7 +188,7 @@ export class GenericLlmAiInsightProvider implements AiInsightProvider {
     const promptText = buildAiPrompt(data);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
 
     try {
       let url = "";
@@ -153,7 +211,7 @@ export class GenericLlmAiInsightProvider implements AiInsightProvider {
         };
       } else {
         // Default: Gemini API
-        const model = this.modelName || "gemini-1.5-flash";
+        const model = this.modelName || "gemini-3.6-flash";
         url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
         bodyData = {
           contents: [{ parts: [{ text: promptText }] }],
@@ -170,13 +228,15 @@ export class GenericLlmAiInsightProvider implements AiInsightProvider {
       clearTimeout(timeoutId);
 
       if (!res.ok) {
+        const errorBody = await res.text();
+        console.error(`[AiProvider] Gemini API Error - HTTP ${res.status} ${res.statusText}: ${errorBody}`);
         if (res.status === 429) {
-          throw new Error("AI Provider rate limit exceeded (HTTP 429)");
+          throw new Error(`AI Provider rate limit exceeded (HTTP 429): ${errorBody}`);
         }
         if (res.status === 401 || res.status === 403) {
-          throw new Error(`AI Provider authentication failed (HTTP ${res.status})`);
+          throw new Error(`AI Provider authentication failed (HTTP ${res.status}): ${errorBody}`);
         }
-        throw new Error(`AI Provider returned HTTP ${res.status}`);
+        throw new Error(`AI Provider returned HTTP ${res.status} ${res.statusText}: ${errorBody}`);
       }
 
       const resJson = await res.json();
@@ -201,7 +261,7 @@ export class GenericLlmAiInsightProvider implements AiInsightProvider {
     } catch (err: any) {
       clearTimeout(timeoutId);
       if (err.name === "AbortError") {
-        throw new Error("AI Provider request timed out (8s limit)");
+        throw new Error("AI Provider request timed out (25s limit)");
       }
       throw new Error(`AI Provider execution failed: ${err.message}`);
     }
