@@ -39,6 +39,13 @@ export interface SlowMovingInventoryItem {
   daysSinceLastSold: number;
 }
 
+export interface MechanicWorkloadItem {
+  id: number;
+  name: string;
+  completedWorkOrders: number;
+  revenue: number;
+}
+
 export interface AiInsightDataReport {
   period: {
     label: string;
@@ -66,6 +73,12 @@ export interface AiInsightDataReport {
     fastMovingItems: FastMovingInventoryItem[];
     slowMovingItems: SlowMovingInventoryItem[];
   };
+  mechanics: {
+    workloads: MechanicWorkloadItem[];
+    maxWorkload: number;
+    avgWorkload: number;
+    imbalanceRatio: number;
+  };
 }
 
 /**
@@ -89,6 +102,7 @@ export async function getAiInsightData(
     currentWoServices,
     prevWoServices,
     newCustomersCount,
+    currentWoMechanics,
   ] = await Promise.all([
     getRevenueReport({
       startDate: period.startDate,
@@ -147,6 +161,27 @@ export async function getAiInsightData(
         createdAt: {
           gte: period.currentPeriod.startObj,
           lte: period.currentPeriod.endObj,
+        },
+      },
+    }),
+    prisma.workOrder.findMany({
+      where: {
+        deletedAt: null,
+        status: "COMPLETED",
+        createdAt: {
+          gte: period.currentPeriod.startObj,
+          lte: period.currentPeriod.endObj,
+        },
+        mechanicId: { not: null },
+      },
+      select: {
+        mechanicId: true,
+        grandTotal: true,
+        mechanic: {
+          select: {
+            id: true,
+            name: true,
+          },
         },
       },
     }),
@@ -278,13 +313,43 @@ export async function getAiInsightData(
     })
   );
 
+  // 5. Mechanics Workload Aggregations
+  const mechanicMap: Record<number, { name: string; completedWorkOrders: number; revenue: number }> = {};
+  for (const wo of currentWoMechanics) {
+    if (!wo.mechanicId || !wo.mechanic) continue;
+    const mId = wo.mechanicId;
+    if (!mechanicMap[mId]) {
+      mechanicMap[mId] = {
+        name: wo.mechanic.name,
+        completedWorkOrders: 0,
+        revenue: 0,
+      };
+    }
+    mechanicMap[mId].completedWorkOrders += 1;
+    mechanicMap[mId].revenue += wo.grandTotal;
+  }
+
+  const mechanicWorkloads: MechanicWorkloadItem[] = Object.entries(mechanicMap).map(
+    ([idStr, data]) => ({
+      id: Number(idStr),
+      name: data.name,
+      completedWorkOrders: data.completedWorkOrders,
+      revenue: data.revenue,
+    })
+  );
+
+  const workloadsList = mechanicWorkloads.map((m) => m.completedWorkOrders);
+  const maxWorkload = workloadsList.length > 0 ? Math.max(...workloadsList) : 0;
+  const avgWorkload = workloadsList.length > 0 ? workloadsList.reduce((a, b) => a + b, 0) / workloadsList.length : 0;
+  const imbalanceRatio = avgWorkload > 0 ? maxWorkload / avgWorkload : 0;
+
   return {
     period: {
       label: period.label,
       startDate: period.startDate,
       endDate: period.endDate,
       previousStartDate: period.previousStartDate,
-      previousEndDate: NordstromDate(period.previousEndDate),
+      previousEndDate: period.previousEndDate,
       durationDays: period.durationDays,
     },
     revenue: revenueMetrics,
@@ -300,6 +365,12 @@ export async function getAiInsightData(
       outOfStockCount: sparePartsReport.summary.outOfStockCount,
       fastMovingItems,
       slowMovingItems,
+    },
+    mechanics: {
+      workloads: mechanicWorkloads,
+      maxWorkload,
+      avgWorkload,
+      imbalanceRatio,
     },
   };
 }

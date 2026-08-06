@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import { AiBusinessInsightCard } from "./AiBusinessInsightCard";
+import { AiHubPanel } from "./AiHubPanel";
 
 // --- Mock Data for Chart ---
 const MOCK_DAILY_REVENUE = [
@@ -59,9 +59,9 @@ export const UnifiedReportsDashboard: React.FC<UnifiedReportsDashboardProps> = (
         </div>
       </section>
 
-      {/* 1.5. AI Business Insight */}
+      {/* 1.4 — AI Hub: Business Alerts, Insight, Priority Actions */}
       <section>
-        <AiBusinessInsightCard filters={filters} />
+        <AiHubPanel filters={filters} />
       </section>
 
       {/* 2. Revenue Overview & Workshop Insights */}
